@@ -224,11 +224,17 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const [isLoaded,    setIsLoaded]    = useState(false);
   const [mounted,     setMounted]     = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [panelsOpen, setPanelsOpen] = useState({ left: false, right: false });
 
   const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
 
   // SSR guard
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { 
+    setMounted(true);
+    if (window.innerWidth >= 1024) {
+      setPanelsOpen({ left: true, right: true });
+    }
+  }, []);
 
   // When scene changes, reset loading state
   useEffect(() => {
@@ -352,116 +358,138 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       )}
 
       {/* ── Right panel: mood presets + controls ── */}
-      <div className="absolute top-20 right-5 z-30 w-[220px] flex flex-col gap-3 pointer-events-auto">
-        {/* Mood presets */}
-        <motion.div initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.4, duration:0.6, ease:[0.22,1,0.36,1] }}
-          className="rounded-2xl overflow-hidden border border-white/[0.07]"
-          style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
-          <div className="px-4 pt-4 pb-2">
-            <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {MOOD_PRESETS.map((p) => (
-                <motion.button key={p.id} id={`preset-${p.id}`}
-                  onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
-                  className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left"
-                  style={{
-                    background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
-                    borderColor: activePreset===p.id ? p.accentColor+"45" : "rgba(255,255,255,0.05)",
-                    boxShadow:   activePreset===p.id ? `0 0 18px ${p.accentColor}18` : "none",
-                  }}
-                  whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}>
-                  <span className="text-lg leading-tight">{p.emoji}</span>
-                  <span className="text-[9px] font-bold mt-1 leading-none" style={{ color:activePreset===p.id?p.accentColor:"#aaa" }}>
-                    {p.label}
-                  </span>
-                </motion.button>
-              ))}
-            </div>
-          </div>
+      <div className="absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto">
+        <button onClick={() => setPanelsOpen(p => ({...p, right: !p.right}))}
+          className="lg:hidden px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white border border-white/[0.1] shadow-lg transition-all active:scale-95"
+          style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}>
+          {panelsOpen.right ? "Hide Controls ⚙" : "Controls ⚙"}
+        </button>
 
-          <div className="mx-4 my-2 h-px bg-white/[0.05]" />
+        <AnimatePresence>
+          {panelsOpen.right && (
+            <motion.div initial={{ opacity:0, x:20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
+              className="w-[220px] flex flex-col gap-3">
+              {/* Mood presets */}
+              <div className="rounded-2xl overflow-hidden border border-white/[0.07]"
+                style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
+                <div className="px-4 pt-4 pb-2">
+                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {MOOD_PRESETS.map((p) => (
+                      <motion.button key={p.id} id={`preset-${p.id}`}
+                        onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
+                        className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left"
+                        style={{
+                          background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
+                          borderColor: activePreset===p.id ? p.accentColor+"45" : "rgba(255,255,255,0.05)",
+                          boxShadow:   activePreset===p.id ? `0 0 18px ${p.accentColor}18` : "none",
+                        }}
+                        whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}>
+                        <span className="text-lg leading-tight">{p.emoji}</span>
+                        <span className="text-[9px] font-bold mt-1 leading-none" style={{ color:activePreset===p.id?p.accentColor:"#aaa" }}>
+                          {p.label}
+                        </span>
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
 
-          {/* Spotlight color */}
-          <div className="px-4 pb-3">
-            <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Light Color</p>
-            <div className="flex flex-wrap gap-1.5">
-              {COLOR_SWATCHES.map((c) => (
-                <button key={c} onClick={() => onLightingChange({ ...lighting, color:c })}
-                  className="w-6 h-6 rounded-lg transition-all hover:scale-110 flex-shrink-0"
-                  style={{ background:c, boxShadow:lighting.color===c?`0 0 0 2px rgba(255,255,255,0.9), 0 0 12px ${c}80`:`0 0 0 1px rgba(255,255,255,0.08)`, transform:lighting.color===c?"scale(1.18)":"scale(1)" }} />
-              ))}
-            </div>
-          </div>
+                <div className="mx-4 my-2 h-px bg-white/[0.05]" />
 
-          <div className="mx-4 my-2 h-px bg-white/[0.05]" />
+                {/* Spotlight color */}
+                <div className="px-4 pb-3">
+                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Light Color</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COLOR_SWATCHES.map((c) => (
+                      <button key={c} onClick={() => onLightingChange({ ...lighting, color:c })}
+                        className="w-6 h-6 rounded-lg transition-all hover:scale-110 flex-shrink-0"
+                        style={{ background:c, boxShadow:lighting.color===c?`0 0 0 2px rgba(255,255,255,0.9), 0 0 12px ${c}80`:`0 0 0 1px rgba(255,255,255,0.08)`, transform:lighting.color===c?"scale(1.18)":"scale(1)" }} />
+                    ))}
+                  </div>
+                </div>
 
-          {/* Intensity slider */}
-          <div className="px-4 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Intensity</p>
-              <span className="text-[9px] font-mono" style={{ color:lighting.color }}>{lighting.intensity}%</span>
-            </div>
-            <input type="range" min={10} max={100} value={lighting.intensity}
-              onChange={(e) => onLightingChange({ ...lighting, intensity:parseInt(e.target.value) })}
-              className="w-full h-1 accent-white cursor-pointer" />
-            <div className="h-1 rounded-full bg-white/[0.04] mt-2 overflow-hidden">
-              <motion.div className="h-full rounded-full"
-                animate={{ width:`${((lighting.intensity-10)/90)*100}%` }}
-                style={{ background:`linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
-            </div>
-          </div>
+                <div className="mx-4 my-2 h-px bg-white/[0.05]" />
 
-          <div className="mx-4 mb-2 h-px bg-white/[0.05]" />
+                {/* Intensity slider */}
+                <div className="px-4 pb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Intensity</p>
+                    <span className="text-[9px] font-mono" style={{ color:lighting.color }}>{lighting.intensity}%</span>
+                  </div>
+                  <input type="range" min={10} max={100} value={lighting.intensity}
+                    onChange={(e) => onLightingChange({ ...lighting, intensity:parseInt(e.target.value) })}
+                    className="w-full h-1 accent-white cursor-pointer" />
+                  <div className="h-1 rounded-full bg-white/[0.04] mt-2 overflow-hidden">
+                    <motion.div className="h-full rounded-full"
+                      animate={{ width:`${((lighting.intensity-10)/90)*100}%` }}
+                      style={{ background:`linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
+                  </div>
+                </div>
 
-          {/* Auto-rotate toggle */}
-          <div className="px-4 pb-4 flex items-center justify-between">
-            <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Auto Rotate</p>
-            <button onClick={() => onLightingChange({ ...lighting, autoRotate:!lighting.autoRotate })}
-              className={`relative w-10 h-5 rounded-full border transition-colors duration-300 ${lighting.autoRotate?"bg-white border-white":"bg-zinc-800 border-zinc-700"}`}>
-              <motion.div className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full ${lighting.autoRotate?"bg-black":"bg-zinc-500"}`}
-                animate={{ x: lighting.autoRotate ? 20 : 0 }}
-                transition={{ type:"spring", stiffness:600, damping:35 }} />
-            </button>
-          </div>
-        </motion.div>
+                <div className="mx-4 mb-2 h-px bg-white/[0.05]" />
 
-        {/* Status badge */}
-        <motion.div initial={{ opacity:0, x:20 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.6 }}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.06]"
-          style={{ background:"rgba(8,8,8,0.65)", backdropFilter:"blur(16px)" }}>
-          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isLoaded?"bg-emerald-400 animate-pulse":"bg-yellow-500 animate-ping"}`} />
-          <span className="text-[9px] font-semibold text-zinc-500">{isLoaded?"Scene loaded · Spline":"Loading scene…"}</span>
-        </motion.div>
+                {/* Auto-rotate toggle */}
+                <div className="px-4 pb-4 flex items-center justify-between">
+                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Auto Rotate</p>
+                  <button onClick={() => onLightingChange({ ...lighting, autoRotate:!lighting.autoRotate })}
+                    className={`relative w-10 h-5 rounded-full border transition-colors duration-300 ${lighting.autoRotate?"bg-white border-white":"bg-zinc-800 border-zinc-700"}`}>
+                    <motion.div className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full ${lighting.autoRotate?"bg-black":"bg-zinc-500"}`}
+                      animate={{ x: lighting.autoRotate ? 20 : 0 }}
+                      transition={{ type:"spring", stiffness:600, damping:35 }} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Status badge */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.06]"
+                style={{ background:"rgba(8,8,8,0.65)", backdropFilter:"blur(16px)" }}>
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isLoaded?"bg-emerald-400 animate-pulse":"bg-yellow-500 animate-ping"}`} />
+                <span className="text-[9px] font-semibold text-zinc-500">{isLoaded?"Scene loaded · Spline":"Loading scene…"}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Multi-Showroom Scene Selector (Glassmorphism) ── */}
-      <div className="absolute bottom-16 left-6 z-30 pointer-events-auto">
-        <div className="p-1.5 rounded-2xl flex flex-col gap-1.5 border border-white/[0.1]"
-             style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
-          {SCENES.map((scene) => {
-            const active = currentSceneId === scene.id;
-            return (
-              <motion.button key={scene.id}
-                onClick={() => onSceneChange(scene.id)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`relative px-5 py-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-300 ${active ? "bg-white/10" : "hover:bg-white/5"}`}>
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm ${active ? "text-white" : "text-zinc-500"}`}>
-                    {scene.type === "spline" ? "✦" : "◈"}
-                  </span>
-                  <span className={`text-xs font-bold uppercase tracking-widest ${active ? "text-white" : "text-zinc-500"}`}>
-                    {scene.name}
-                  </span>
-                </div>
-                {active && (
-                  <motion.div layoutId="scene-indicator"
-                    className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
-                )}
-              </motion.button>
-            )
-          })}
-        </div>
+      <div className="absolute bottom-6 lg:bottom-16 left-6 z-30 flex flex-col items-start gap-3 pointer-events-auto">
+        <button onClick={() => setPanelsOpen(p => ({...p, left: !p.left}))}
+          className="lg:hidden px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white border border-white/[0.1] shadow-lg transition-all active:scale-95"
+          style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}>
+          {panelsOpen.left ? "Hide Showrooms ✦" : "Showrooms ✦"}
+        </button>
+
+        <AnimatePresence>
+          {panelsOpen.left && (
+            <motion.div initial={{ opacity:0, x:-20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:-20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
+                 className="p-1.5 rounded-2xl flex flex-col gap-1.5 border border-white/[0.1]"
+                 style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
+              {SCENES.map((scene) => {
+                const active = currentSceneId === scene.id;
+                return (
+                  <motion.button key={scene.id}
+                    onClick={() => onSceneChange(scene.id)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`relative px-5 py-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-300 ${active ? "bg-white/10" : "hover:bg-white/5"}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-sm ${active ? "text-white" : "text-zinc-500"}`}>
+                        {scene.type === "spline" ? "✦" : "◈"}
+                      </span>
+                      <span className={`text-xs font-bold uppercase tracking-widest ${active ? "text-white" : "text-zinc-500"}`}>
+                        {scene.name}
+                      </span>
+                    </div>
+                    {active && (
+                      <motion.div layoutId="scene-indicator"
+                        className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                    )}
+                  </motion.button>
+                )
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Bottom gradient fade */}
