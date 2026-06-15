@@ -34,6 +34,12 @@ const SUPABASE_ANON_KEY = "sb_publishable_sh92dIOhgb0wew25kly21w_xSLYWdko";
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+export interface ThreePointLights {
+  key: { intensity: number; color: string };
+  fill: { intensity: number; color: string };
+  rim: { intensity: number; color: string };
+}
+
 interface SceneConfig {
   id: string;
   name: string;
@@ -225,12 +231,14 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
 // ─────────────────────────────────────────────────────────────────────────────
 //  SPLINE HERO SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation, isNeonMode, onToggleNeon }:
+function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation, studioLights, onStudioLightsChange, materialMode, onMaterialModeChange }:
   { currentSceneId: string; onSceneChange: (id: string) => void;
     lighting: LightingState; onLightingChange: (l: LightingState) => void;
     criticMode: boolean; onCanvasClick: (x: number, y: number, cx: number, cy: number) => void;
     presentationMode: boolean; onTogglePresentation: () => void;
-    isNeonMode: boolean; onToggleNeon: () => void }) {
+    studioLights: ThreePointLights; onStudioLightsChange: (l: ThreePointLights) => void;
+    materialMode: string; onMaterialModeChange: (m: string) => void;
+  }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const splineAppRef = useRef<any>(null);
@@ -242,12 +250,12 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const [zoomLevel,   setZoomLevel]   = useState(1);
   
   // ── Framer Motion Drag Zoom ────────────────────────────────────────────────
-  const dragY = useMotionValue((1 - ((1 - 0.5) / 2)) * 230); 
+  const dragY = useMotionValue((1 - ((1 - 0.85) / 1.65)) * 230); 
   
   const handleDrag = () => {
     const y = dragY.get();
     const ratio = 1 - Math.max(0, Math.min(1, y / 230));
-    setZoomLevel(0.5 + ratio * 2.0);
+    setZoomLevel(0.85 + ratio * 1.65);
   };
 
   const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
@@ -297,34 +305,29 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
     };
   }, [lighting.autoRotate]);
 
-  // ── Neon Mode Spline Lighting ───────────────────────────────────────────────
+  // ── Studio 3-Point Lighting & Material ──────────────────────────────────────
   useEffect(() => {
     const app = splineAppRef.current;
     if (!app) return;
     try {
-      if (isNeonMode) {
-        app.setVariable?.("NeonIntensity", 100);
-        app.setVariable?.("Neon", true);
-        if (app.getObjects) {
-          app.getObjects().forEach((o: any) => {
-            if (o.type?.includes("Light") && o.color) {
-              o.color.r = 1; o.color.g = 0; o.color.b = 0.5; // Hot Pink
-            }
-          });
-        }
-      } else {
-        app.setVariable?.("NeonIntensity", 0);
-        app.setVariable?.("Neon", false);
-        if (app.getObjects) {
-          app.getObjects().forEach((o: any) => {
-            if (o.type?.includes("Light") && o.color) {
-              o.color.r = 1; o.color.g = 1; o.color.b = 1; // Restore
-            }
-          });
-        }
+      app.setVariable?.("MaterialMode", materialMode);
+      
+      app.setVariable?.("KeyLightIntensity", studioLights.key.intensity);
+      app.setVariable?.("KeyLightColor", studioLights.key.color);
+      app.setVariable?.("FillLightIntensity", studioLights.fill.intensity);
+      app.setVariable?.("FillLightColor", studioLights.fill.color);
+      app.setVariable?.("RimLightIntensity", studioLights.rim.intensity);
+      app.setVariable?.("RimLightColor", studioLights.rim.color);
+
+      if (app.getObjects) {
+        app.getObjects().forEach((o: any) => {
+          if (o.name === "Key Light" && o.color) o.color.set?.(studioLights.key.color);
+          if (o.name === "Fill Light" && o.color) o.color.set?.(studioLights.fill.color);
+          if (o.name === "Rim Light" && o.color) o.color.set?.(studioLights.rim.color);
+        });
       }
     } catch (_) {}
-  }, [isNeonMode, lighting.color, isLoaded]);
+  }, [studioLights, materialMode, isLoaded]);
 
   // SSR guard
   useEffect(() => { 
@@ -545,19 +548,11 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
       {/* ── Right panel: mood presets + controls ── */}
       <div className={`absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-        {/* Neon Mode Toggle */}
-        <motion.button onClick={onToggleNeon}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${isNeonMode ? 'border-pink-500/80 bg-pink-500/20' : 'border-pink-500/30 hover:bg-pink-500/10'}`}
-          style={{ 
-            background: isNeonMode ? "rgba(255, 0, 127, 0.15)" : "rgba(10,10,10,0.6)", 
-            backdropFilter:"blur(16px)",
-            boxShadow: isNeonMode ? "0 0 25px rgba(255, 0, 127, 0.9), inset 0 0 15px rgba(255, 0, 127, 0.3)" : "0 0 15px rgba(255, 0, 127, 0.15)"
-          }}
-          whileHover={ isNeonMode ? { scale:1.02, boxShadow: "0 0 35px rgba(255, 0, 127, 1), inset 0 0 20px rgba(255, 0, 127, 0.6)" } : { scale:1.02 } } 
-          whileTap={{ scale:0.96 }}>
-          <span>✨</span>
-          <span className={`text-[10px] font-bold uppercase tracking-widest ${isNeonMode ? 'text-pink-200 drop-shadow-[0_0_5px_rgba(255,0,127,1)]' : 'text-pink-400'}`}>Neon Light</span>
-        </motion.button>
+        {/* Studio Controls Toggle (Visual Indicator) */}
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/20 bg-black/60 backdrop-blur-xl shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+          <span>🎬</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white">3D Render Studio</span>
+        </div>
 
         {/* Presentation Toggle */}
         <motion.button onClick={onTogglePresentation}
@@ -595,7 +590,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                      className="absolute top-0 flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing z-20 touch-none"
                    >
                      {/* Pure CSS Inverted Triangle (▽) */}
-                     <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[10px] ${isNeonMode ? 'border-t-[#ff007f] drop-shadow-[0_0_10px_rgba(255,0,127,1)]' : 'border-t-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]'}`} />
+                     <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[10px] border-t-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
                    </motion.div>
                 </div>
                 <span className="text-[10px] font-bold text-zinc-500 mt-3">-</span>
@@ -712,19 +707,16 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         <AnimatePresence>
           {panelsOpen.left && (
             <motion.div initial={{ opacity:0, x:-20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:-20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
-                 className={`p-1.5 rounded-2xl flex flex-col gap-1.5 border transition-all duration-500 ${isNeonMode ? 'border-pink-500/50' : 'border-white/[0.1]'}`}
-                 style={{ 
-                   background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)",
-                   boxShadow: isNeonMode ? "0 0 15px rgba(255, 0, 127, 0.4), inset 0 0 8px rgba(255, 0, 127, 0.2)" : "none"
-                 }}>
+                 className="p-1.5 rounded-2xl flex flex-col gap-1.5 border border-white/[0.1] transition-all duration-500"
+                 style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
               {SCENES.map((scene) => {
                 const active = currentSceneId === scene.id;
                 return (
                   <motion.button key={scene.id}
                     onClick={() => onSceneChange(scene.id)}
-                    whileHover={ isNeonMode ? { scale: 1.02, boxShadow: "0 0 15px rgba(255, 0, 127, 0.8), inset 0 0 10px rgba(255, 0, 127, 0.4)" } : { scale: 1.02 } }
+                    whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className={`relative px-5 py-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-300 ${active ? (isNeonMode ? "bg-pink-500/30 shadow-[0_0_15px_rgba(255,0,127,0.5)] border-pink-500/50" : "bg-white/10 border-transparent") : (isNeonMode ? "hover:bg-pink-500/10 border-transparent" : "hover:bg-white/5 border-transparent")} border`}>
+                    className={`relative px-5 py-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-300 ${active ? "bg-white/10 border-transparent" : "hover:bg-white/5 border-transparent"} border`}>
                     <div className="flex items-center gap-3">
                       <span className={`text-sm ${active ? "text-white" : "text-zinc-500"}`}>
                         {scene.type === "spline" ? "✦" : "◈"}
@@ -1290,7 +1282,12 @@ function CriticPopover({ popover, onClose, onSubmit }:
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
-  const [isNeonMode, setNeonMode] = useState(false);
+  const [studioLights, setStudioLights] = useState<ThreePointLights>({
+    key: { intensity: 100, color: '#ffffff' },
+    fill: { intensity: 50, color: '#a0c0ff' },
+    rim: { intensity: 80, color: '#ffb0a0' }
+  });
+  const [materialMode, setMaterialMode] = useState<string>('Matte');
   const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [criticMode,    setCriticMode]    = useState(false);
@@ -1416,8 +1413,10 @@ export default function ThreeDMoodApp() {
             }}
             presentationMode={presentationMode}
             onTogglePresentation={handleTogglePresentation}
-            isNeonMode={isNeonMode}
-            onToggleNeon={() => setNeonMode(p => !p)}
+            studioLights={studioLights}
+            onStudioLightsChange={setStudioLights}
+            materialMode={materialMode}
+            onMaterialModeChange={setMaterialMode}
           />
         </div>
       </section>
