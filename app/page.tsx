@@ -1,12 +1,12 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  3D Mood — Production v7  (Spline Edition)
+//  3D Mood — Production v8  (High-End Multi-Showroom)
 //  Spline 3D · Supabase · Glassmorphism · Framer Motion
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
-  useState, useEffect, useRef, useCallback, Component,
+  useState, useEffect, useRef, useCallback,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
@@ -17,10 +17,14 @@ const SUPABASE_URL      = "https://ychptrhmedfjzairkzwh.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_sh92dIOhgb0wew25kly21w_xSLYWdko";
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ─── Spline scene ─────────────────────────────────────────────────────────────
-const SPLINE_SCENE = "https://prod.spline.design/6Wq1Q7YAnsnasGyT/scene.splinecode";
-
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface SceneConfig {
+  id: string;
+  name: string;
+  type: "spline" | "obj" | "gltf"; // For future extensibility
+  url: string;
+}
+
 interface LightingState {
   intensity: number;
   color: string;
@@ -43,6 +47,12 @@ interface PopoverState {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+const SCENES: SceneConfig[] = [
+  { id: "molang",   name: "Test 1", type: "spline", url: "https://prod.spline.design/dCRqPKHivD1pvJqRV2EgK7xd/scene.splinecode" },
+  { id: "tubes",    name: "Test 2", type: "spline", url: "https://prod.spline.design/ysfwoAx5lQUC1YBJHbAJtllX/scene.splinecode" },
+  { id: "concrete", name: "Test 3", type: "spline", url: "https://prod.spline.design/ay59aodnex3hFiqc9i5tAJCX/scene.splinecode" },
+];
+
 const MOOD_PRESETS: MoodPreset[] = [
   {
     id: "dawn",      label: "#Dawn",      emoji: "🌅", description: "Warm golden hour",
@@ -131,7 +141,7 @@ function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => 
 function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
   { isOpen: boolean; activeSection: string; onScrollTo: (id: string) => void; onClose: () => void }) {
   const navItems = [
-    { id: "studio",    label: "3D Studio",      icon: "✦", desc: "Interactive Spline scene" },
+    { id: "studio",    label: "3D Studio",       icon: "✦", desc: "Interactive Spline scenes" },
     { id: "mood",      label: "Mood & Lighting", icon: "◎", desc: "Color & atmosphere" },
     { id: "guestbook", label: "Guestbook",       icon: "✉", desc: "Community notes" },
     { id: "feedback",  label: "Feedback",        icon: "◈", desc: "Critic dashboard" },
@@ -160,9 +170,9 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
             </div>
             <div className="px-6 py-6 border-b border-zinc-100">
               <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
-                <p className="font-bold text-sm text-black mb-1">Free Mode Active</p>
+                <p className="font-bold text-sm text-black mb-1">Showroom Active</p>
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  Explore the 3D scene, set the mood, leave notes, and critique designs — no sign-in needed.
+                  Explore curated 3D scenes, set the mood, leave notes, and critique designs — no sign-in needed.
                 </p>
               </div>
             </div>
@@ -198,8 +208,9 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
 // ─────────────────────────────────────────────────────────────────────────────
 //  SPLINE HERO SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
-  { lighting: LightingState; onLightingChange: (l: LightingState) => void;
+function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick }:
+  { currentSceneId: string; onSceneChange: (id: string) => void;
+    lighting: LightingState; onLightingChange: (l: LightingState) => void;
     criticMode: boolean; onCanvasClick: (x: number, y: number, cx: number, cy: number) => void }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -208,8 +219,16 @@ function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
   const [mounted,     setMounted]     = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
 
+  const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
+
   // SSR guard
   useEffect(() => { setMounted(true); }, []);
+
+  // When scene changes, reset loading state
+  useEffect(() => {
+    setIsLoaded(false);
+    splineAppRef.current = null;
+  }, [currentSceneId]);
 
   // ── Spline onLoad: cache the app reference ────────────────────────────────
   const handleSplineLoad = useCallback((app: any) => {
@@ -221,20 +240,18 @@ function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
       app.setVariable?.("Intensity",   lighting.intensity / 100);
       app.setVariable?.("LightColor",  lighting.color);
       app.setVariable?.("AutoRotate",  lighting.autoRotate);
-    } catch (_) { /* scene may not expose these variables — visual CSS fallback covers it */ }
-  }, []);
+    } catch (_) { /* fallback handles visual changes */ }
+  }, [lighting]);
 
   // ── Sync lighting state → Spline API + CSS ─────────────────────────────────
   useEffect(() => {
     const app = splineAppRef.current;
     if (!app) return;
     try {
-      // Try common Spline variable names — if the scene doesn't have them it's a no-op
       app.setVariable?.("Intensity",   lighting.intensity / 100);
       app.setVariable?.("LightColor",  lighting.color);
       app.setVariable?.("AutoRotate",  lighting.autoRotate);
 
-      // Try to find light objects by common names and set their properties
       const lightObj = app.findObjectByName?.("DirectionalLight")
                     ?? app.findObjectByName?.("SpotLight")
                     ?? app.findObjectByName?.("PointLight")
@@ -245,11 +262,6 @@ function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
       }
     } catch (_) { /* silently ignore — CSS overlay provides visual feedback */ }
   }, [lighting]);
-
-  // ── Auto-rotate: CSS animation fallback ───────────────────────────────────
-  // (Spline handles it natively if onLoad worked; CSS is the visual safety net)
-  const rotateStyle = lighting.autoRotate
-    ? { animation: "splineRotate 12s linear infinite" } : {};
 
   // ── Critic click capture ───────────────────────────────────────────────────
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -262,29 +274,20 @@ function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
   };
 
   // Derived CSS values from lighting state
-  const brightness  = (0.4 + (lighting.intensity / 100) * 1.0).toFixed(2); // 0.4 → 1.4
+  const brightness  = (0.4 + (lighting.intensity / 100) * 1.0).toFixed(2);
   const overlayHex  = lighting.color;
   const overlayAlpha= Math.round((lighting.intensity / 100) * 0.18 * 255).toString(16).padStart(2,"0");
   const glowHex     = lighting.color;
   const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
 
-  const toolBtnCls = (active: boolean, ac: string) =>
-    `px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border whitespace-nowrap ${active ? ac : "bg-white/5 text-zinc-500 hover:bg-white/12 hover:text-white border-white/10"}`;
-
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#030303]">
-      {/* ── CSS keyframe for auto-rotate fallback ── */}
-      <style>{`
-        @keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
-      `}</style>
+      {/* CSS keyframe for auto-rotate fallback */}
+      <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
-      {/* ── Color/brightness overlay (lighting simulation) ── */}
+      {/* ── Lighting Simulation Overlay ── */}
       <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
-        style={{
-          background: `${overlayHex}${overlayAlpha}`,
-          filter:      `brightness(${brightness})`,
-          mixBlendMode:"screen",
-        }} />
+        style={{ background: `${overlayHex}${overlayAlpha}`, filter: `brightness(${brightness})`, mixBlendMode:"screen" }} />
 
       {/* ── Edge glow wings ── */}
       <div className="absolute inset-0 pointer-events-none z-[11] transition-all duration-700" style={{
@@ -301,13 +304,15 @@ function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
       <div ref={containerRef}
         className="absolute inset-0 z-0 transition-all duration-1000"
         style={{ filter: `brightness(${brightness})` }}>
-        {mounted && (
+        {mounted && currentScene.type === "spline" && (
           <Spline
-            scene={SPLINE_SCENE}
+            key={currentScene.id}
+            scene={currentScene.url}
             onLoad={handleSplineLoad}
             style={{ width:"100%", height:"100%", display:"block" }}
           />
         )}
+        
         {/* Loading skeleton */}
         <AnimatePresence>
           {(!isLoaded || !mounted) && (
@@ -368,7 +373,6 @@ function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
             </div>
           </div>
 
-          {/* Divider */}
           <div className="mx-4 my-2 h-px bg-white/[0.05]" />
 
           {/* Spotlight color */}
@@ -424,14 +428,35 @@ function SplineHero({ lighting, onLightingChange, criticMode, onCanvasClick }:
         </motion.div>
       </div>
 
-      {/* ── Bottom scroll hint ── */}
-      <motion.div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-none"
-        initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:1.8 }}>
-        <span className="text-[10px] text-white/20 tracking-widest uppercase font-semibold">Scroll</span>
-        <motion.div animate={{ y:[0,6,0] }} transition={{ duration:1.8, repeat:Infinity, ease:"easeInOut" }}
-          className="w-[1px] h-8 rounded-full"
-          style={{ background:`linear-gradient(to bottom, ${glowHex}50, transparent)` }} />
-      </motion.div>
+      {/* ── Multi-Showroom Scene Selector (Glassmorphism) ── */}
+      <div className="absolute bottom-16 left-6 z-30 pointer-events-auto">
+        <div className="p-1.5 rounded-2xl flex flex-col gap-1.5 border border-white/[0.1]"
+             style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
+          {SCENES.map((scene) => {
+            const active = currentSceneId === scene.id;
+            return (
+              <motion.button key={scene.id}
+                onClick={() => onSceneChange(scene.id)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`relative px-5 py-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-300 ${active ? "bg-white/10" : "hover:bg-white/5"}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`text-sm ${active ? "text-white" : "text-zinc-500"}`}>
+                    {scene.type === "spline" ? "✦" : "◈"}
+                  </span>
+                  <span className={`text-xs font-bold uppercase tracking-widest ${active ? "text-white" : "text-zinc-500"}`}>
+                    {scene.name}
+                  </span>
+                </div>
+                {active && (
+                  <motion.div layoutId="scene-indicator"
+                    className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                )}
+              </motion.button>
+            )
+          })}
+        </div>
+      </div>
 
       {/* Bottom gradient fade */}
       <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-[12]"
@@ -559,7 +584,7 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
       const { data, error } = await supabase
         .from("guestbook")
         .select("*")
-        .order("id", { ascending: false })  // created_at 컬럼 없으므로 id 사용
+        .order("id", { ascending: false })
         .limit(100);
       if (error) throw new Error(error.message);
       setEntries((data as GuestbookEntry[]) ?? []);
@@ -577,9 +602,7 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
     const ch = supabase.channel("guestbook-rt")
       .on("postgres_changes", { event:"INSERT", schema:"public", table:"guestbook" }, (payload) => {
         setEntries((prev) => {
-          // optimistic 항목 교체
           if (prev.some(e => e.optimistic)) return prev.map(e => e.optimistic ? (payload.new as GuestbookEntry) : e);
-          // 중복 방지
           if (prev.some(e => e.id === (payload.new as any).id)) return prev;
           return [payload.new as GuestbookEntry, ...prev];
         });
@@ -594,7 +617,6 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
     if (!form.name.trim() || !form.content.trim()) return;
     setSubmitting(true); setError(null);
 
-    // Optimistic UI
     const optimistic: GuestbookEntry = {
       id: Date.now(), name: form.name.trim(), content: form.content.trim(),
       color: form.color, optimistic: true,
@@ -953,6 +975,7 @@ export default function ThreeDMoodApp() {
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [criticMode,    setCriticMode]    = useState(false);
   const [activeSection, setActiveSection] = useState("studio");
+  const [currentSceneId,setCurrentSceneId]= useState(SCENES[0].id);
   const [lighting,      setLighting]      = useState<LightingState>({
     intensity: 70, color: "#FFFFFF", autoRotate: false,
   });
@@ -1053,6 +1076,8 @@ export default function ThreeDMoodApp() {
       <section ref={studioRef} id="studio" className="relative" style={{ height:"100vh" }}>
         <div className="sticky top-16 w-full" style={{ height:"calc(100vh - 64px)" }}>
           <SplineHero
+            currentSceneId={currentSceneId}
+            onSceneChange={setCurrentSceneId}
             lighting={lighting}
             onLightingChange={setLighting}
             criticMode={criticMode}
@@ -1082,7 +1107,7 @@ export default function ThreeDMoodApp() {
             <div className="w-6 h-6 rounded bg-white flex items-center justify-center">
               <span className="text-black text-[9px] font-black">3D</span>
             </div>
-            <span>© 2026 3D Mood · Free Mode</span>
+            <span>© 2026 3D Mood · Showroom Mode</span>
           </div>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
