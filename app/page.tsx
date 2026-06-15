@@ -242,31 +242,35 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
   const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
 
-  // ── Auto Rotate Simulation via Pointer Drag ───────────────────────────────
+  // ── Auto Rotate Simulation via Spline API ───────────────────────────────
   useEffect(() => {
     if (!lighting.autoRotate) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       return;
     }
-    const canvas = containerRef.current?.querySelector('canvas');
-    if (!canvas) return;
-
-    let x = window.innerWidth / 2;
-    const y = window.innerHeight / 2;
     
-    // Simulate pointer down to grab the orbit controls
-    canvas.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, buttons: 1, pointerId: 99 }));
-
     const loop = () => {
-      x -= 2; // rotation speed
-      canvas.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, buttons: 1, pointerId: 99 }));
+      const app = splineAppRef.current;
+      if (app) {
+        // Find the main Spline scene or a fallback group and rotate its Y-axis
+        const scene = app._scene || (app.getScene && app.getScene());
+        if (scene && scene.rotation) {
+          scene.rotation.y -= 0.005; // Smooth turntable rotation
+        } else if (app.getObjects) {
+          // Fallback if _scene is hidden: try rotating all top-level groups
+          const groups = app.getObjects().filter((o: any) => o.type === "Group" && (!o.parent || o.parent.type === "Scene"));
+          groups.forEach((g: any) => {
+            if (g.rotation) g.rotation.y -= 0.005;
+          });
+        }
+      }
       rafRef.current = requestAnimationFrame(loop);
     };
-    loop();
+    
+    rafRef.current = requestAnimationFrame(loop);
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      canvas.dispatchEvent(new PointerEvent("pointerup", { clientX: x, clientY: y, pointerId: 99 }));
     };
   }, [lighting.autoRotate]);
 
