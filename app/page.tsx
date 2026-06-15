@@ -275,6 +275,27 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
     };
   }, [lighting.autoRotate]);
 
+  // ── Neon Mode Spline Lighting ───────────────────────────────────────────────
+  useEffect(() => {
+    const app = splineAppRef.current;
+    if (!app) return;
+    try {
+      if (isNeonMode) {
+        app.setVariable?.("NeonIntensity", 100);
+        const lightObj = app.findObjectByName?.("DirectionalLight") ?? app.findObjectByName?.("SpotLight") ?? app.findObjectByName?.("Light");
+        if (lightObj) {
+           if (lightObj.color?.set) lightObj.color.set("#ff007f"); // Hot Pink
+        }
+      } else {
+        app.setVariable?.("NeonIntensity", 0);
+        const lightObj = app.findObjectByName?.("DirectionalLight") ?? app.findObjectByName?.("SpotLight") ?? app.findObjectByName?.("Light");
+        if (lightObj) {
+           if (lightObj.color?.set) lightObj.color.set(lighting.color); // Restore
+        }
+      }
+    } catch (_) {}
+  }, [isNeonMode, lighting.color, isLoaded]);
+
   // SSR guard
   useEffect(() => { 
     setMounted(true);
@@ -419,10 +440,10 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
 
   return (
-    <div className={`relative w-full h-full overflow-hidden transition-colors duration-1000 ${isNeonMode ? 'bg-[#000000]' : 'bg-[#030303]'}`}>
+    <div className={`relative w-full h-full overflow-hidden transition-colors duration-1000 ${isNeonMode ? 'bg-[#050505]' : 'bg-[#030303]'}`}>
       {/* ── Neon Background Glow ── */}
-      <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isNeonMode ? 'opacity-100' : 'opacity-0'}`}
-           style={{ background: 'radial-gradient(circle at 50% 50%, rgba(138, 43, 226, 0.15) 0%, rgba(255, 0, 127, 0.1) 40%, transparent 80%)', filter: 'blur(60px)' }} />
+      <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isNeonMode ? 'opacity-40 blur-3xl' : 'opacity-0'}`}
+           style={{ background: 'radial-gradient(circle at 50% 50%, rgba(255, 0, 127, 0.8) 0%, rgba(138, 43, 226, 0.5) 50%, transparent 80%)' }} />
 
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
@@ -495,9 +516,9 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
           style={{ 
             background: isNeonMode ? "rgba(255, 0, 127, 0.15)" : "rgba(10,10,10,0.6)", 
             backdropFilter:"blur(16px)",
-            boxShadow: isNeonMode ? "0 0 15px rgba(255, 0, 127, 0.8), inset 0 0 10px rgba(255, 0, 127, 0.4)" : "0 0 15px rgba(255, 0, 127, 0.15)"
+            boxShadow: isNeonMode ? "0 0 25px rgba(255, 0, 127, 0.9), inset 0 0 15px rgba(255, 0, 127, 0.3)" : "0 0 15px rgba(255, 0, 127, 0.15)"
           }}
-          whileHover={{ scale:1.02, boxShadow: "0 0 25px rgba(255, 0, 127, 1), inset 0 0 15px rgba(255, 0, 127, 0.6)" }} 
+          whileHover={ isNeonMode ? { scale:1.02, boxShadow: "0 0 35px rgba(255, 0, 127, 1), inset 0 0 20px rgba(255, 0, 127, 0.6)" } : { scale:1.02 } } 
           whileTap={{ scale:0.96 }}>
           <span>✨</span>
           <span className={`text-[10px] font-bold uppercase tracking-widest ${isNeonMode ? 'text-pink-200 drop-shadow-[0_0_5px_rgba(255,0,127,1)]' : 'text-pink-400'}`}>Neon Light</span>
@@ -538,7 +559,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               <div className={`rounded-2xl overflow-hidden border transition-all duration-500 ${isNeonMode ? 'border-pink-500/50' : 'border-white/[0.07]'}`}
                 style={{ 
                   background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)",
-                  boxShadow: isNeonMode ? "0 0 15px rgba(255, 0, 127, 0.4), inset 0 0 8px rgba(255, 0, 127, 0.2)" : "none"
+                  boxShadow: isNeonMode ? "0 0 25px rgba(255, 0, 127, 0.9), inset 0 0 15px rgba(255, 0, 127, 0.3)" : "none"
                 }}>
                 <div className="px-4 pt-4 pb-2">
                   <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
