@@ -452,52 +452,63 @@ function CameraPresetRig({ preset }: { preset: CamPreset }) {
   return null;
 }
 
-// ── Photorealistic mood lighting (fixed for 2-unit models) ───────────────────
+// ── Mood lighting — wide coverage, fills entire monitor ──────────────────────
 function MoodLight({ lighting }: { lighting: LightingState }) {
   const { intensity, color, angle, direction } = lighting;
 
   const pos: [number, number, number] =
-    direction === "top"   ? [0.2,  6,  0.2] :
-    direction === "front" ? [0,    3,  6  ] :
-    direction === "back"  ? [0,    3, -6  ] :
-    direction === "left"  ? [-6,   3,  0  ] :
-                            [6,    3,  0  ];
+    direction === "top"   ? [0.2,  9,  0.2] :
+    direction === "front" ? [0,    4,  10 ] :
+    direction === "back"  ? [0,    4, -10 ] :
+    direction === "left"  ? [-10,  4,  0  ] :
+                            [10,   4,  0  ];
 
-  const mainInt = (intensity / 100) * 14;
-  const fillInt = (intensity / 100) * 2.5;
-  const rimInt  = (intensity / 100) * 1.5;
+  const mainInt = (intensity / 100) * 20;   // bright key light
+  const sideInt = (intensity / 100) * 6.0;  // wide left+right fills
+  const fillInt = (intensity / 100) * 5.0;  // counter fill
+  const rimInt  = (intensity / 100) * 2.5;  // cool back rim
 
   return (
     <>
-      <hemisphereLight color="#c8d8ff" groundColor="#0d0510" intensity={0.4} />
+      {/* Hemisphere — soft ambient base */}
+      <hemisphereLight color="#d2e0ff" groundColor="#12080e" intensity={0.65} />
 
+      {/* Main key spotlight */}
       <spotLight
         position={pos}
         target-position={[0, 0, 0]}
-        angle={(Math.min(angle, 65) * Math.PI) / 180}
-        penumbra={0.75}
+        angle={(Math.min(angle, 80) * Math.PI) / 180}
+        penumbra={0.85}
         color={color}
         intensity={mainInt}
         castShadow
         shadow-mapSize={[4096, 4096]}
         shadow-bias={-0.00003}
         shadow-camera-near={0.1}
-        shadow-camera-far={30}
-        decay={2}
-        distance={28}
+        shadow-camera-far={50}
+        decay={1.2}
+        distance={50}
       />
 
+      {/* ─── Wide left fill (covers left half of screen) ─── */}
+      <directionalLight position={[-15, 6, 5]} color={color} intensity={sideInt} />
+
+      {/* ─── Wide right fill (covers right half of screen) ─── */}
+      <directionalLight position={[15, 6, 5]} color={color} intensity={sideInt} />
+
+      {/* Soft counter fill opposite to key */}
       <directionalLight
-        position={[-pos[0] * 0.5, pos[1] * 0.4, -pos[2] * 0.5]}
-        color={color} intensity={fillInt}
+        position={[-pos[0] * 0.6, pos[1] * 0.35, -pos[2] * 0.6]}
+        color={color}
+        intensity={fillInt}
       />
-      <directionalLight
-        position={[pos[0] * 0.1, 1.5, -6]}
-        color="#a0c0ff" intensity={rimInt}
-      />
+
+      {/* Cool blue rim / back light */}
+      <directionalLight position={[0, 4, -14]} color="#7aadff" intensity={rimInt} />
     </>
   );
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HERO CANVAS
@@ -600,7 +611,6 @@ function HeroCanvas({
           <SoftShadows size={12} samples={16} focus={0.85} />
           <Environment preset="warehouse" environmentIntensity={0.4} />
           <MoodLight lighting={lighting} />
-          <ZoomRig mult={zoomMult} />
           <CameraPresetRig preset={camPreset} />
 
           {fileUrl ? (
@@ -626,7 +636,10 @@ function HeroCanvas({
 
           <OrbitControls
             target={[0, 0, 0]}
-            enableZoom={false}
+            enableZoom={true}
+            zoomSpeed={1.2}
+            minDistance={1.2}
+            maxDistance={12}
             enablePan={false}
             minPolarAngle={0.05}
             maxPolarAngle={Math.PI * 0.55}
