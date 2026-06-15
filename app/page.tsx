@@ -225,10 +225,11 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
 // ─────────────────────────────────────────────────────────────────────────────
 //  SPLINE HERO SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick }:
+function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation }:
   { currentSceneId: string; onSceneChange: (id: string) => void;
     lighting: LightingState; onLightingChange: (l: LightingState) => void;
-    criticMode: boolean; onCanvasClick: (x: number, y: number, cx: number, cy: number) => void }) {
+    criticMode: boolean; onCanvasClick: (x: number, y: number, cx: number, cy: number) => void;
+    presentationMode: boolean; onTogglePresentation: () => void }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const splineAppRef = useRef<any>(null);
@@ -448,7 +449,16 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       )}
 
       {/* ── Right panel: mood presets + controls ── */}
-      <div className="absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto">
+      <div className={`absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+        {/* Presentation Toggle */}
+        <motion.button onClick={onTogglePresentation}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/30 hover:bg-yellow-500/10 transition-all shadow-[0_0_15px_rgba(234,179,8,0.15)]"
+          style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}
+          whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
+          <span>🌟</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Presentation Mode</span>
+        </motion.button>
+
         <button onClick={() => setPanelsOpen(p => ({...p, right: !p.right}))}
           className="lg:hidden px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white border border-white/[0.1] shadow-lg transition-all active:scale-95"
           style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}>
@@ -554,7 +564,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       </div>
 
       {/* ── Multi-Showroom Scene Selector (Glassmorphism) ── */}
-      <div className="absolute bottom-6 lg:bottom-16 left-6 z-30 flex flex-col items-start gap-3 pointer-events-auto">
+      <div className={`absolute bottom-6 lg:bottom-16 left-6 z-30 flex flex-col items-start gap-3 pointer-events-auto transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
         <button onClick={() => setPanelsOpen(p => ({...p, left: !p.left}))}
           className="lg:hidden px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white border border-white/[0.1] shadow-lg transition-all active:scale-95"
           style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}>
@@ -597,6 +607,34 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* Bottom gradient fade */}
       <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-[12]"
         style={{ background:"linear-gradient(to bottom, transparent, #000)" }} />
+      {/* ── Presentation Mode Menu ── */}
+      <AnimatePresence>
+        {presentationMode && (
+          <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:30 }} transition={{ duration:0.6, ease:[0.22,1,0.36,1] }}
+            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border border-white/[0.15] shadow-2xl"
+            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
+            <button onClick={() => { splineAppRef.current?.setZoom?.(1); onLightingChange({...lighting, autoRotate:false}); }}
+              className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
+              정면 뷰
+            </button>
+            <button onClick={() => { splineAppRef.current?.setZoom?.(1.5); onLightingChange({...lighting, autoRotate:false}); }}
+              className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
+              디테일 뷰
+            </button>
+            <button onClick={() => { splineAppRef.current?.setZoom?.(1.2); onLightingChange({...lighting, autoRotate:true}); }}
+              className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${lighting.autoRotate?'bg-emerald-400 animate-pulse':'bg-zinc-500'}`} />
+              시네마틱 턴테이블
+            </button>
+            <div className="w-px h-6 bg-white/20 mx-1" />
+            <button onClick={onTogglePresentation}
+              className="px-4 py-2.5 rounded-full text-xs font-bold text-red-400 hover:bg-red-400/10 transition-colors flex items-center gap-1.5">
+              <span className="text-lg leading-none">×</span> 닫기
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
@@ -1108,9 +1146,20 @@ function CriticPopover({ popover, onClose, onSubmit }:
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
+  const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [criticMode,    setCriticMode]    = useState(false);
   const [activeSection, setActiveSection] = useState("studio");
+
+  const handleTogglePresentation = () => {
+    setPresentationMode(p => {
+      if (!p) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setDrawerOpen(false);
+      }
+      return !p;
+    });
+  };
   const [currentSceneId,setCurrentSceneId]= useState(SCENES[0].id);
   const [lighting,      setLighting]      = useState<LightingState>({
     intensity: 70, color: "#FFFFFF", autoRotate: false,
@@ -1168,9 +1217,9 @@ export default function ThreeDMoodApp() {
   };
 
   return (
-    <div className="min-h-screen bg-black overflow-x-hidden">
+    <div className={`min-h-screen bg-black overflow-x-hidden ${presentationMode ? "h-screen overflow-hidden" : ""}`}>
       {/* ── Fixed Header ── */}
-      <header className="fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10"
+      <header className={`fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10 transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         style={{ background:"rgba(0,0,0,0.78)", backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
         <motion.button onClick={() => scrollToSection("studio")}
           initial={{ opacity:0, x:-16 }} animate={{ opacity:1, x:0 }} transition={{ duration:0.5, ease:[0.22,1,0.36,1] }}
@@ -1220,13 +1269,17 @@ export default function ThreeDMoodApp() {
             onCanvasClick={(x,y,cx,cy) => {
               if (criticMode) setPopover({ visible:true, x:cx+12, y:cy-20, canvasX:x, canvasY:y });
             }}
+            presentationMode={presentationMode}
+            onTogglePresentation={handleTogglePresentation}
           />
         </div>
       </section>
 
-      <MoodSection      lighting={lighting} onChange={setLighting} sectionRef={moodRef} />
-      <GuestbookSection sectionRef={guestbookRef} />
-      <FeedbackSection  sectionRef={feedbackRef} />
+      <div className={`transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none h-0 overflow-hidden" : "opacity-100"}`}>
+        <MoodSection      lighting={lighting} onChange={setLighting} sectionRef={moodRef} />
+        <GuestbookSection sectionRef={guestbookRef} />
+        <FeedbackSection  sectionRef={feedbackRef} />
+      </div>
 
       <AnimatePresence>
         {popover.visible && (
