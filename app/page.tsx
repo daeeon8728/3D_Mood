@@ -225,11 +225,12 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
 // ─────────────────────────────────────────────────────────────────────────────
 //  SPLINE HERO SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation }:
+function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation, isNeonMode, onToggleNeon }:
   { currentSceneId: string; onSceneChange: (id: string) => void;
     lighting: LightingState; onLightingChange: (l: LightingState) => void;
     criticMode: boolean; onCanvasClick: (x: number, y: number, cx: number, cy: number) => void;
-    presentationMode: boolean; onTogglePresentation: () => void }) {
+    presentationMode: boolean; onTogglePresentation: () => void;
+    isNeonMode: boolean; onToggleNeon: () => void }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const splineAppRef = useRef<any>(null);
@@ -418,7 +419,11 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#030303]">
+    <div className={`relative w-full h-full overflow-hidden transition-colors duration-1000 ${isNeonMode ? 'bg-[#000000]' : 'bg-[#030303]'}`}>
+      {/* ── Neon Background Glow ── */}
+      <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isNeonMode ? 'opacity-100' : 'opacity-0'}`}
+           style={{ background: 'radial-gradient(circle at 50% 50%, rgba(138, 43, 226, 0.15) 0%, rgba(255, 0, 127, 0.1) 40%, transparent 80%)', filter: 'blur(60px)' }} />
+
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
@@ -484,6 +489,20 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
       {/* ── Right panel: mood presets + controls ── */}
       <div className={`absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+        {/* Neon Mode Toggle */}
+        <motion.button onClick={onToggleNeon}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${isNeonMode ? 'border-pink-500/80 bg-pink-500/20' : 'border-pink-500/30 hover:bg-pink-500/10'}`}
+          style={{ 
+            background: isNeonMode ? "rgba(255, 0, 127, 0.15)" : "rgba(10,10,10,0.6)", 
+            backdropFilter:"blur(16px)",
+            boxShadow: isNeonMode ? "0 0 15px rgba(255, 0, 127, 0.8), inset 0 0 10px rgba(255, 0, 127, 0.4)" : "0 0 15px rgba(255, 0, 127, 0.15)"
+          }}
+          whileHover={{ scale:1.02, boxShadow: "0 0 25px rgba(255, 0, 127, 1), inset 0 0 15px rgba(255, 0, 127, 0.6)" }} 
+          whileTap={{ scale:0.96 }}>
+          <span>✨</span>
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${isNeonMode ? 'text-pink-200 drop-shadow-[0_0_5px_rgba(255,0,127,1)]' : 'text-pink-400'}`}>Neon Light</span>
+        </motion.button>
+
         {/* Presentation Toggle */}
         <motion.button onClick={onTogglePresentation}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/30 hover:bg-yellow-500/10 transition-all shadow-[0_0_15px_rgba(234,179,8,0.15)]"
@@ -516,8 +535,11 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               </motion.button>
 
               {/* Mood presets */}
-              <div className="rounded-2xl overflow-hidden border border-white/[0.07]"
-                style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
+              <div className={`rounded-2xl overflow-hidden border transition-all duration-500 ${isNeonMode ? 'border-pink-500/50' : 'border-white/[0.07]'}`}
+                style={{ 
+                  background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)",
+                  boxShadow: isNeonMode ? "0 0 15px rgba(255, 0, 127, 0.4), inset 0 0 8px rgba(255, 0, 127, 0.2)" : "none"
+                }}>
                 <div className="px-4 pt-4 pb-2">
                   <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -564,11 +586,12 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                   </div>
                   <input type="range" min={10} max={100} value={lighting.intensity}
                     onChange={(e) => onLightingChange({ ...lighting, intensity:parseInt(e.target.value) })}
-                    className="w-full h-1 accent-white cursor-pointer" />
-                  <div className="h-1 rounded-full bg-white/[0.04] mt-2 overflow-hidden">
+                    className={`w-full h-1 cursor-pointer transition-colors duration-500 ${isNeonMode ? 'accent-pink-500' : 'accent-white'}`}
+                    style={{ textShadow: isNeonMode ? "0 0 10px #ff007f" : "none" }} />
+                  <div className={`h-1 rounded-full mt-2 overflow-hidden transition-all duration-500 ${isNeonMode ? 'bg-pink-900/30 shadow-[0_0_10px_rgba(255,0,127,0.4)]' : 'bg-white/[0.04]'}`}>
                     <motion.div className="h-full rounded-full"
                       animate={{ width:`${((lighting.intensity-10)/90)*100}%` }}
-                      style={{ background:`linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
+                      style={{ background: isNeonMode ? `linear-gradient(90deg, rgba(255,0,127,0.5), rgba(255,0,127,1))` : `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
                   </div>
                 </div>
 
@@ -608,16 +631,19 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         <AnimatePresence>
           {panelsOpen.left && (
             <motion.div initial={{ opacity:0, x:-20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:-20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
-                 className="p-1.5 rounded-2xl flex flex-col gap-1.5 border border-white/[0.1]"
-                 style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
+                 className={`p-1.5 rounded-2xl flex flex-col gap-1.5 border transition-all duration-500 ${isNeonMode ? 'border-pink-500/50' : 'border-white/[0.1]'}`}
+                 style={{ 
+                   background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)",
+                   boxShadow: isNeonMode ? "0 0 15px rgba(255, 0, 127, 0.4), inset 0 0 8px rgba(255, 0, 127, 0.2)" : "none"
+                 }}>
               {SCENES.map((scene) => {
                 const active = currentSceneId === scene.id;
                 return (
                   <motion.button key={scene.id}
                     onClick={() => onSceneChange(scene.id)}
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={ isNeonMode ? { scale: 1.02, boxShadow: "0 0 15px rgba(255, 0, 127, 0.8), inset 0 0 10px rgba(255, 0, 127, 0.4)" } : { scale: 1.02 } }
                     whileTap={{ scale: 0.98 }}
-                    className={`relative px-5 py-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-300 ${active ? "bg-white/10" : "hover:bg-white/5"}`}>
+                    className={`relative px-5 py-3 rounded-xl flex items-center justify-between gap-4 transition-all duration-300 ${active ? (isNeonMode ? "bg-pink-500/30 shadow-[0_0_15px_rgba(255,0,127,0.5)] border-pink-500/50" : "bg-white/10 border-transparent") : (isNeonMode ? "hover:bg-pink-500/10 border-transparent" : "hover:bg-white/5 border-transparent")} border`}>
                     <div className="flex items-center gap-3">
                       <span className={`text-sm ${active ? "text-white" : "text-zinc-500"}`}>
                         {scene.type === "spline" ? "✦" : "◈"}
@@ -645,8 +671,11 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       <AnimatePresence>
         {presentationMode && (
           <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:30 }} transition={{ duration:0.6, ease:[0.22,1,0.36,1] }}
-            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border border-white/[0.15] shadow-2xl"
-            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
+            className={`absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border shadow-2xl transition-all duration-500 ${isNeonMode ? 'border-pink-500/80' : 'border-white/[0.15]'}`}
+            style={{ 
+              background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)",
+              boxShadow: isNeonMode ? "0 0 20px rgba(255, 0, 127, 0.6), inset 0 0 10px rgba(255, 0, 127, 0.3)" : undefined
+            }}>
             <button onClick={() => { setZoomLevel(1); onLightingChange({...lighting, autoRotate:false}); }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
               Front View
@@ -1180,6 +1209,7 @@ function CriticPopover({ popover, onClose, onSubmit }:
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
+  const [isNeonMode, setNeonMode] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [criticMode,    setCriticMode]    = useState(false);
@@ -1305,6 +1335,8 @@ export default function ThreeDMoodApp() {
             }}
             presentationMode={presentationMode}
             onTogglePresentation={handleTogglePresentation}
+            isNeonMode={isNeonMode}
+            onToggleNeon={() => setNeonMode(p => !p)}
           />
         </div>
       </section>
