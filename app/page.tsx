@@ -252,6 +252,19 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
   const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
 
+  // ── Block Spline Native Wheel Zoom ─────────────────────────────────────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const preventWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    // Use capture phase to intercept the wheel event before it reaches Spline Canvas
+    container.addEventListener("wheel", preventWheel, { passive: false, capture: true });
+    return () => container.removeEventListener("wheel", preventWheel, { capture: true });
+  }, []);
+
   // ── Auto Rotate Simulation via Spline API ───────────────────────────────
   useEffect(() => {
     if (!lighting.autoRotate) {
