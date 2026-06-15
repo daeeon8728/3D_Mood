@@ -285,6 +285,27 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
     onCanvasClick(x, y, e.clientX, e.clientY);
   };
 
+  // ── Capture Studio ────────────────────────────────────────────────────────
+  const handleCapture = () => {
+    const canvas = containerRef.current?.querySelector('canvas');
+    if (!canvas) {
+      alert("Canvas not found!");
+      return;
+    }
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      if (dataUrl === "data:,") throw new Error("Blank image");
+      
+      const link = document.createElement("a");
+      link.download = "3d-mood-studio.png";
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Capture failed:", err);
+      alert("Failed to capture image. The 3D context might not be accessible.");
+    }
+  };
+
   // Derived CSS values from lighting state
   const brightness  = (0.4 + (lighting.intensity / 100) * 1.0).toFixed(2);
   const overlayHex  = lighting.color;
@@ -369,6 +390,18 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
           {panelsOpen.right && (
             <motion.div initial={{ opacity:0, x:20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
               className="w-[220px] flex flex-col gap-3">
+              {/* Capture Studio Button */}
+              <motion.button onClick={handleCapture}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/[0.15] hover:bg-white/[0.08] transition-colors"
+                style={{ background:"rgba(255,255,255,0.05)", backdropFilter:"blur(24px)", boxShadow:"0 4px 24px rgba(0,0,0,0.2)" }}
+                whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
+                <span className="text-xl">📷</span>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-bold text-white tracking-wide">Capture Studio</span>
+                  <span className="text-[9px] text-zinc-400">Save as PNG image</span>
+                </div>
+              </motion.button>
+
               {/* Mood presets */}
               <div className="rounded-2xl overflow-hidden border border-white/[0.07]"
                 style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
