@@ -319,12 +319,15 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       app.setVariable?.("RimLightIntensity", studioLights.rim.intensity);
       app.setVariable?.("RimLightColor", studioLights.rim.color);
 
-      if (app.getObjects) {
-        app.getObjects().forEach((o: any) => {
-          if (o.name === "Key Light" && o.color) o.color.set?.(studioLights.key.color);
-          if (o.name === "Fill Light" && o.color) o.color.set?.(studioLights.fill.color);
-          if (o.name === "Rim Light" && o.color) o.color.set?.(studioLights.rim.color);
-        });
+      if (app.findObjectByName) {
+        const keyL = app.findObjectByName("Key Light");
+        if (keyL) { keyL.intensity = studioLights.key.intensity; if (keyL.color?.set) keyL.color.set(studioLights.key.color); }
+        
+        const fillL = app.findObjectByName("Fill Light");
+        if (fillL) { fillL.intensity = studioLights.fill.intensity; if (fillL.color?.set) fillL.color.set(studioLights.fill.color); }
+        
+        const rimL = app.findObjectByName("Rim Light");
+        if (rimL) { rimL.intensity = studioLights.rim.intensity; if (rimL.color?.set) rimL.color.set(studioLights.rim.color); }
       }
     } catch (_) {}
   }, [studioLights, materialMode, isLoaded]);
@@ -611,75 +614,39 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                 </div>
               </motion.button>
 
-              {/* Mood presets */}
-              {/* Mood presets */}
-              <div className="rounded-2xl overflow-hidden border transition-all duration-500 border-white/[0.07]"
+              {/* Studio Setup */}
+              <div className="rounded-2xl overflow-hidden border border-white/[0.07] transition-all duration-500"
                 style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
-                <div className="px-4 pt-4 pb-2">
-                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {MOOD_PRESETS.map((p) => (
-                      <motion.button key={p.id} id={`preset-${p.id}`}
-                        onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
-                        className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left"
-                        style={{
-                          background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
-                          borderColor: activePreset===p.id ? p.accentColor+"45" : "rgba(255,255,255,0.05)",
-                          boxShadow:   activePreset===p.id ? `0 0 18px ${p.accentColor}18` : "none",
-                        }}
-                        whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}>
-                        <span className="text-lg leading-tight">{p.emoji}</span>
-                        <span className="text-[9px] font-bold mt-1 leading-none" style={{ color:activePreset===p.id?p.accentColor:"#aaa" }}>
-                          {p.label}
-                        </span>
-                      </motion.button>
+                <div className="px-4 pt-4 pb-3">
+                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Material Presets</p>
+                  <div className="flex gap-2 mb-6">
+                    {["Glass", "Matte", "Chrome"].map(mat => (
+                      <button key={mat} onClick={() => onMaterialModeChange(mat)}
+                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg border transition-all ${materialMode === mat ? "bg-white text-black border-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10"}`}>
+                        {mat}
+                      </button>
                     ))}
                   </div>
-                </div>
-
-                <div className="mx-4 my-2 h-px bg-white/[0.05]" />
-
-                {/* Spotlight color */}
-                <div className="px-4 pb-3">
-                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Light Color</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {COLOR_SWATCHES.map((c) => (
-                      <button key={c} onClick={() => onLightingChange({ ...lighting, color:c })}
-                        className="w-6 h-6 rounded-lg transition-all hover:scale-110 flex-shrink-0"
-                        style={{ background:c, boxShadow:lighting.color===c?`0 0 0 2px rgba(255,255,255,0.9), 0 0 12px ${c}80`:`0 0 0 1px rgba(255,255,255,0.08)`, transform:lighting.color===c?"scale(1.18)":"scale(1)" }} />
+                  
+                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">3-Point Lighting</p>
+                  <div className="flex flex-col gap-4">
+                    {(Object.entries(studioLights) as [keyof ThreePointLights, {intensity: number, color: string}][]).map(([key, light]) => (
+                      <div key={key} className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-semibold text-zinc-300 uppercase">{key} Light</span>
+                          <input type="color" value={light.color} 
+                            onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, color: e.target.value}})}
+                            className="w-5 h-5 rounded-full border border-white/20 cursor-pointer bg-transparent" />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <input type="range" min="0" max="200" value={light.intensity}
+                            onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, intensity: parseInt(e.target.value)}})}
+                            className="w-full h-1 bg-white/10 rounded-full appearance-none outline-none cursor-pointer" />
+                          <span className="text-[9px] text-zinc-500 w-6">{light.intensity}</span>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                </div>
-
-                <div className="mx-4 my-2 h-px bg-white/[0.05]" />
-
-                {/* Intensity slider */}
-                <div className="px-4 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Intensity</p>
-                    <span className="text-[9px] font-mono" style={{ color:lighting.color }}>{lighting.intensity}%</span>
-                  </div>
-                  <input type="range" min={10} max={100} value={lighting.intensity}
-                    onChange={(e) => onLightingChange({ ...lighting, intensity:parseInt(e.target.value) })}
-                    className="w-full h-1 cursor-pointer transition-colors duration-500 accent-white" />
-                  <div className="h-1 rounded-full mt-2 overflow-hidden transition-all duration-500 bg-white/[0.04]">
-                    <motion.div className="h-full rounded-full"
-                      animate={{ width:`${((lighting.intensity-10)/90)*100}%` }}
-                      style={{ background: `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
-                  </div>
-                </div>
-
-                <div className="mx-4 mb-2 h-px bg-white/[0.05]" />
-
-                {/* Auto-rotate toggle */}
-                <div className="px-4 pb-4 flex items-center justify-between">
-                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Auto Rotate</p>
-                  <button onClick={() => onLightingChange({ ...lighting, autoRotate:!lighting.autoRotate })}
-                    className={`relative w-10 h-5 rounded-full border transition-colors duration-300 ${lighting.autoRotate?"bg-white border-white":"bg-zinc-800 border-zinc-700"}`}>
-                    <motion.div className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full ${lighting.autoRotate?"bg-black":"bg-zinc-500"}`}
-                      animate={{ x: lighting.autoRotate ? 20 : 0 }}
-                      transition={{ type:"spring", stiffness:600, damping:35 }} />
-                  </button>
                 </div>
               </div>
 
@@ -753,7 +720,12 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
               Detail View
             </button>
-            <button onClick={() => { setZoomLevel(1.1); onLightingChange({...lighting, autoRotate:!lighting.autoRotate}); }}
+            <button onClick={() => { 
+                setZoomLevel(1.1); 
+                onLightingChange({...lighting, autoRotate: true}); 
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+                if (splineAppRef.current) splineAppRef.current.setVariable?.("AutoRotate", true);
+              }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors flex items-center gap-2">
               <span className={`w-1.5 h-1.5 rounded-full ${lighting.autoRotate?'bg-emerald-400 animate-pulse':'bg-zinc-500'}`} />
               Cinematic Turntable
