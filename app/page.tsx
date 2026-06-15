@@ -17,6 +17,17 @@ const Spline = dynamic(() => import("@splinetool/react-spline"), {
   ssr: false, 
 });
 
+// Force preserveDrawingBuffer to allow Spline canvas screenshotting
+if (typeof window !== "undefined") {
+  const originalGetContext = HTMLCanvasElement.prototype.getContext;
+  (HTMLCanvasElement.prototype as any).getContext = function (type: string, attributes?: any) {
+    if (type === "webgl" || type === "webgl2") {
+      attributes = Object.assign({}, attributes || {}, { preserveDrawingBuffer: true });
+    }
+    return originalGetContext.call(this, type, attributes);
+  };
+}
+
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL      = "https://ychptrhmedfjzairkzwh.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_sh92dIOhgb0wew25kly21w_xSLYWdko";
@@ -287,13 +298,35 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
   // ── Capture Studio ────────────────────────────────────────────────────────
   const handleCapture = () => {
-    const canvas = containerRef.current?.querySelector('canvas');
-    if (!canvas) {
+    const webglCanvas = containerRef.current?.querySelector('canvas');
+    if (!webglCanvas) {
       alert("Canvas not found!");
       return;
     }
     try {
-      const dataUrl = canvas.toDataURL("image/png");
+      const canvas2d = document.createElement("canvas");
+      canvas2d.width = webglCanvas.width || webglCanvas.clientWidth;
+      canvas2d.height = webglCanvas.height || webglCanvas.clientHeight;
+      const ctx = canvas2d.getContext("2d");
+      if (!ctx) return;
+
+      // 1. Draw solid dark background
+      ctx.fillStyle = "#030303";
+      ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+
+      // 2. Draw the 3D model
+      ctx.drawImage(webglCanvas, 0, 0);
+
+      // 3. Draw the CSS overlay mood lighting
+      const overlayAlpha = (lighting.intensity / 100) * 0.18;
+      if (overlayAlpha > 0) {
+        ctx.globalCompositeOperation = "screen";
+        ctx.fillStyle = lighting.color;
+        ctx.globalAlpha = overlayAlpha;
+        ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+      }
+
+      const dataUrl = canvas2d.toDataURL("image/png", 1.0);
       if (dataUrl === "data:,") throw new Error("Blank image");
       
       const link = document.createElement("a");
@@ -302,7 +335,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       link.click();
     } catch (err) {
       console.error("Capture failed:", err);
-      alert("Failed to capture image. The 3D context might not be accessible.");
+      alert("Failed to capture image. WebGL context might be missing preserveDrawingBuffer.");
     }
   };
 
