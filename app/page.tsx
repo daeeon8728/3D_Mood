@@ -308,10 +308,30 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
   // ── Studio 3-Point Lighting & Material ──────────────────────────────────────
   useEffect(() => {
-    // As per user request, we no longer interact with Spline variables for lighting/materials.
-    // The CSS filters and background gradients handle all visual FX in real-time.
-    console.log(`[Studio FX] Material: ${materialMode}, Lights Updated`);
-  }, [studioLights, materialMode]);
+    const app = splineAppRef.current;
+    if (!app) return;
+    try {
+      app.setVariable?.("MaterialMode", materialMode);
+      
+      app.setVariable?.("KeyLightIntensity", studioLights.key.intensity);
+      app.setVariable?.("KeyLightColor", studioLights.key.color);
+      app.setVariable?.("FillLightIntensity", studioLights.fill.intensity);
+      app.setVariable?.("FillLightColor", studioLights.fill.color);
+      app.setVariable?.("RimLightIntensity", studioLights.rim.intensity);
+      app.setVariable?.("RimLightColor", studioLights.rim.color);
+
+      if (app.findObjectByName) {
+        const keyL = app.findObjectByName("Key Light");
+        if (keyL) { keyL.intensity = studioLights.key.intensity; if (keyL.color?.set) keyL.color.set(studioLights.key.color); }
+        
+        const fillL = app.findObjectByName("Fill Light");
+        if (fillL) { fillL.intensity = studioLights.fill.intensity; if (fillL.color?.set) fillL.color.set(studioLights.fill.color); }
+        
+        const rimL = app.findObjectByName("Rim Light");
+        if (rimL) { rimL.intensity = studioLights.rim.intensity; if (rimL.color?.set) rimL.color.set(studioLights.rim.color); }
+      }
+    } catch (_) {}
+  }, [studioLights, materialMode, isLoaded]);
 
   // SSR guard
   useEffect(() => { 
@@ -471,7 +491,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
     } else if (materialMode === "Matte") {
       containerFilter = "grayscale(30%) contrast(0.7) brightness(1.1)";
     } else if (materialMode === "Chrome") {
-      containerFilter = "contrast(1.8) brightness(1.5) saturate(150%) hue-rotate(5deg)";
+      containerFilter = "contrast(1.3) brightness(1.2) saturate(150%) hue-rotate(5deg)";
     }
   }
 
