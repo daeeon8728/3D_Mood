@@ -282,15 +282,23 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
     try {
       if (isNeonMode) {
         app.setVariable?.("NeonIntensity", 100);
-        const lightObj = app.findObjectByName?.("DirectionalLight") ?? app.findObjectByName?.("SpotLight") ?? app.findObjectByName?.("Light");
-        if (lightObj) {
-           if (lightObj.color?.set) lightObj.color.set("#ff007f"); // Hot Pink
+        app.setVariable?.("Neon", true);
+        if (app.getObjects) {
+          app.getObjects().forEach((o: any) => {
+            if (o.type?.includes("Light") && o.color) {
+              o.color.r = 1; o.color.g = 0; o.color.b = 0.5; // Hot Pink
+            }
+          });
         }
       } else {
         app.setVariable?.("NeonIntensity", 0);
-        const lightObj = app.findObjectByName?.("DirectionalLight") ?? app.findObjectByName?.("SpotLight") ?? app.findObjectByName?.("Light");
-        if (lightObj) {
-           if (lightObj.color?.set) lightObj.color.set(lighting.color); // Restore
+        app.setVariable?.("Neon", false);
+        if (app.getObjects) {
+          app.getObjects().forEach((o: any) => {
+            if (o.type?.includes("Light") && o.color) {
+              o.color.r = 1; o.color.g = 1; o.color.b = 1; // Restore
+            }
+          });
         }
       }
     } catch (_) {}
@@ -450,24 +458,28 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
       {/* ── Lighting Simulation Overlay ── */}
       <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
-        style={{ background: `${overlayHex}${overlayAlpha}`, filter: `brightness(${brightness})`, mixBlendMode:"screen" }} />
+        style={{ 
+          background: isNeonMode ? "radial-gradient(circle at 50% 50%, rgba(255,0,127,0.3) 0%, rgba(138,43,226,0.1) 100%)" : `${overlayHex}${overlayAlpha}`, 
+          filter: `brightness(${brightness})`, 
+          mixBlendMode: isNeonMode ? "color-dodge" : "screen" 
+        }} />
 
       {/* ── Edge glow wings ── */}
       <div className="absolute inset-0 pointer-events-none z-[11] transition-all duration-700" style={{
-        background: `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
+        background: isNeonMode ? "none" : `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
       }} />
       <div className="absolute top-0 left-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+        background: isNeonMode ? "none" : `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
       }} />
       <div className="absolute top-0 right-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+        background: isNeonMode ? "none" : `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
       }} />
 
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
-        className="absolute inset-0 z-0 transition-all duration-1000"
+        className="absolute inset-0 z-0"
         onContextMenu={e => e.preventDefault()}
-        style={{ filter: `brightness(${brightness})`, transform: `scale(${zoomLevel})` }}>
+        style={{ filter: `brightness(${brightness})`, transform: `scale(${zoomLevel})`, transition: "filter 1s ease-in-out" }}>
         {mounted && currentScene.type === "spline" && (
           <Spline
             key={currentScene.id}
@@ -546,27 +558,23 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               className="flex items-start gap-4">
               
               {/* ▽ Vertical Zoom Controller */}
-              <div className="flex flex-col items-center py-4 px-2 rounded-2xl border border-white/[0.1] bg-black/40 backdrop-blur-xl h-[340px] shadow-2xl">
-                <span className="text-[10px] font-bold text-zinc-500 mb-2">+</span>
-                <div className="relative flex-1 w-1.5 bg-white/10 rounded-full">
-                   <input type="range" min={0.5} max={2.5} step={0.05} value={zoomLevel}
-                     onChange={(e) => {
-                       const val = parseFloat(e.target.value);
-                       setZoomLevel(val);
-                       splineAppRef.current?.setZoom?.(val);
-                     }}
-                     className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
-                     style={{ writingMode: "bt-lr" as any, WebkitAppearance: "slider-vertical" as any }}
+              <div className="flex flex-col items-center justify-between py-4 px-2 rounded-2xl border border-white/[0.1] bg-black/40 backdrop-blur-xl h-[340px] shadow-2xl">
+                <span className="text-[10px] font-bold text-zinc-500 mb-3">+</span>
+                <div className="relative w-4 h-[250px] flex items-center justify-center">
+                   <input type="range" min={0.5} max={2.5} step={0.01} value={zoomLevel}
+                     onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+                     className="absolute w-[250px] h-4 opacity-0 cursor-pointer z-20"
+                     style={{ transform: "rotate(-90deg)" }}
                    />
-                   <motion.div className="absolute w-4 h-4 left-1/2 -translate-x-1/2 pointer-events-none flex items-center justify-center"
-                     style={{ bottom: `${((zoomLevel - 0.5)/2)*100}%`, marginBottom:"-8px" }}>
-                     <svg viewBox="0 0 24 24" fill={isNeonMode ? "#ff007f" : "#ffffff"} className="w-full h-full drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">
+                   <div className="absolute w-1.5 h-[250px] bg-white/10 rounded-full" />
+                   <motion.div className="absolute w-5 h-5 left-1/2 -translate-x-1/2 pointer-events-none flex items-center justify-center z-10"
+                     style={{ bottom: `${((zoomLevel - 0.5)/2)*100}%`, marginBottom:"-10px" }}>
+                     <svg viewBox="0 0 24 24" fill={isNeonMode ? "#ff007f" : "#ffffff"} className="w-full h-full drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
                        <path d="M12 24L0 0H24L12 24Z" />
                      </svg>
                    </motion.div>
                 </div>
-                <span className="text-[10px] font-bold text-zinc-500 mt-2">-</span>
-                <span className="text-[8px] font-bold text-zinc-400 mt-2 rotate-90 whitespace-nowrap uppercase tracking-widest translate-y-4">Zoom</span>
+                <span className="text-[10px] font-bold text-zinc-500 mt-3">-</span>
               </div>
 
               <div className="w-[220px] flex flex-col gap-3">
