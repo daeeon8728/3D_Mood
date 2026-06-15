@@ -556,7 +556,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                        splineAppRef.current?.setZoom?.(val);
                      }}
                      className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
-                     style={{ writingMode: "bt-lr", WebkitAppearance: "slider-vertical" }}
+                     style={{ writingMode: "bt-lr" as any, WebkitAppearance: "slider-vertical" as any }}
                    />
                    <motion.div className="absolute w-4 h-4 left-1/2 -translate-x-1/2 pointer-events-none flex items-center justify-center"
                      style={{ bottom: `${((zoomLevel - 0.5)/2)*100}%`, marginBottom:"-8px" }}>
