@@ -476,6 +476,21 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const glowHex     = lighting.color;
   const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
 
+  // Material CSS Filters
+  let containerFilter = `brightness(${brightness})`;
+  let containerOpacity = 1;
+  let containerBackdrop = "none";
+  if (isStudioMode) {
+    if (materialMode === "Glass") {
+      containerBackdrop = "blur(5px) saturate(180%)";
+      containerOpacity = 0.8;
+    } else if (materialMode === "Matte") {
+      containerFilter = `brightness(${brightness}) contrast(0.9)`;
+    } else if (materialMode === "Chrome") {
+      containerFilter = `brightness(${brightness}) contrast(1.4) hue-rotate(10deg)`;
+    }
+  }
+
   return (
     <div className="relative w-full h-full overflow-hidden transition-colors duration-1000 bg-[#030303]">
       {/* ── Background ── */}
@@ -503,11 +518,35 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
       }} />
 
+      {/* ── Studio 3-Point Lighting Simulation Overlay ── */}
+      {isStudioMode && (
+        <div className="absolute inset-0 pointer-events-none z-[-1] mix-blend-screen transition-opacity duration-1000">
+          {/* Key Light */}
+          <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%]" style={{
+            background: `radial-gradient(circle, ${studioLights.key.color}${Math.round((studioLights.key.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 60%)`
+          }} />
+          {/* Fill Light */}
+          <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%]" style={{
+            background: `radial-gradient(circle, ${studioLights.fill.color}${Math.round((studioLights.fill.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 60%)`
+          }} />
+          {/* Rim Light */}
+          <div className="absolute top-[-30%] right-[10%] w-[60%] h-[60%]" style={{
+            background: `radial-gradient(circle, ${studioLights.rim.color}${Math.round((studioLights.rim.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 70%)`
+          }} />
+        </div>
+      )}
+
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
         className="absolute inset-0 z-0"
         onContextMenu={e => e.preventDefault()}
-        style={{ filter: `brightness(${brightness})`, transform: `scale(${zoomLevel})`, transition: "filter 1s ease-in-out" }}>
+        style={{ 
+          filter: containerFilter, 
+          backdropFilter: containerBackdrop,
+          opacity: containerOpacity,
+          transform: `scale(${zoomLevel})`, 
+          transition: "all 1s ease-in-out" 
+        }}>
         {mounted && currentScene.type === "spline" && (
           <Spline
             key={currentScene.id}
