@@ -1,37 +1,36 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  3D Mood — Free Mode Version
-//  Single-page scroll: Hero Canvas → Mood/Lighting → Guestbook → Feedback
-//  WebGL 3D Integration via React Three Fiber
+//  3D Mood — Production v3
+//  For 3D graphic designers · Full Supabase backend · WebGL studio
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
-  useState, useEffect, useRef, useCallback, useMemo,
-  DragEvent, ChangeEvent, Suspense,
+  useState, useEffect, useRef, useCallback, useMemo, Suspense,
+  DragEvent, ChangeEvent,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// ─── 3D ENGINE IMPORTS ────────────────────────────────────────────────────────
+// ─── 3D ENGINE ────────────────────────────────────────────────────────────────
 import * as THREE from "three";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
-import { useGLTF, OrbitControls, Environment, SoftShadows, ContactShadows } from "@react-three/drei";
+import {
+  useGLTF, OrbitControls, Environment, SoftShadows, ContactShadows,
+} from "@react-three/drei";
 import { OBJLoader } from "three-stdlib";
 
-// ─── Supabase — hardcoded per spec (publishable anon key, safe for frontend) ──
-const SUPABASE_URL = "https://ychptrhmedfjzairkzwh.supabase.co";
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL     = "https://ychptrhmedfjzairkzwh.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_sh92dIOhgb0wew25kly21w_xSLYWdko";
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type LightDir = "top" | "front" | "back" | "left" | "right";
+type LightDir   = "top" | "front" | "back" | "left" | "right";
+type CamPreset  = "perspective" | "front" | "side" | "top";
 
 interface LightingState {
-  intensity: number;
-  color: string;
-  angle: number;
-  direction: LightDir;
+  intensity: number; color: string; angle: number; direction: LightDir;
 }
 interface MoodPreset {
   id: string; label: string; emoji: string; description: string;
@@ -53,7 +52,7 @@ interface PopoverState {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MOOD_PRESETS: MoodPreset[] = [
   {
-    id: "dawn", label: "#Dawn", emoji: "🌅", description: "Warm golden hour",
+    id: "dawn",   label: "#Dawn",      emoji: "🌅", description: "Warm golden hour",
     lighting: { intensity: 75, color: "#FFB347", angle: 35, direction: "top" },
     gradientFrom: "#FF6B35", gradientTo: "#FFB347", accentColor: "#FFB347",
   },
@@ -90,27 +89,26 @@ const CRITIC_CATEGORIES = [
 // ─── Motion Variants ──────────────────────────────────────────────────────────
 const springFast = { type: "spring" as const, stiffness: 500, damping: 35 };
 const drawerVariants = {
-  hidden: { x: "100%", opacity: 0 },
+  hidden:  { x: "100%", opacity: 0 },
   visible: { x: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 35 } },
-  exit: { x: "100%", opacity: 0, transition: { duration: 0.25, ease: "easeIn" } },
+  exit:    { x: "100%", opacity: 0, transition: { duration: 0.25, ease: "easeIn" } },
 };
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
+  hidden:  { opacity: 0, y: 30 },
   visible: (i: number) => ({
     opacity: 1, y: 0,
-    transition: { delay: i * 0.08, duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+    transition: { delay: i * 0.08, duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number,number,number,number] },
   }),
 };
 const popoverVariants = {
-  hidden: { opacity: 0, scale: 0.85, y: 8 },
-  visible: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 500, damping: 30 } },
-  exit: { opacity: 0, scale: 0.85, y: 8, transition: { duration: 0.15 } },
+  hidden:  { opacity: 0, scale: 0.85, y: 8 },
+  visible: { opacity: 1, scale: 1,    y: 0, transition: { type: "spring", stiffness: 500, damping: 30 } },
+  exit:    { opacity: 0, scale: 0.85, y: 8, transition: { duration: 0.15 } },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SMALL COMPONENTS
+//  SMALL UI COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
-
 function CriticModeSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
   return (
     <button id="critic-mode-switch" onClick={onToggle} aria-label="Toggle Critic Mode"
@@ -123,8 +121,7 @@ function CriticModeSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: (
         <motion.div
           className={`absolute top-[3px] left-[3px] w-[18px] h-[18px] rounded-full ${enabled ? "bg-black" : "bg-zinc-500"}`}
           animate={{ x: enabled ? 20 : 0 }}
-          transition={{ type: "spring", stiffness: 600, damping: 35 }}
-        />
+          transition={{ type: "spring", stiffness: 600, damping: 35 }} />
       </div>
     </button>
   );
@@ -154,19 +151,16 @@ function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => 
 //  NAVIGATION DRAWER
 // ─────────────────────────────────────────────────────────────────────────────
 interface DrawerProps {
-  isOpen: boolean;
-  activeSection: string;
-  onScrollTo: (id: string) => void;
-  onClose: () => void;
+  isOpen: boolean; activeSection: string;
+  onScrollTo: (id: string) => void; onClose: () => void;
 }
 function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: DrawerProps) {
   const navItems = [
-    { id: "studio", label: "3D Studio", icon: "✦", desc: "Gallery & artwork" },
-    { id: "lighting", label: "Mood & Lighting", icon: "◎", desc: "Color & atmosphere" },
-    { id: "guestbook", label: "Guestbook", icon: "✉", desc: "Community notes" },
-    { id: "feedback", label: "Feedback", icon: "◈", desc: "Critic dashboard" },
+    { id: "studio",    label: "3D Studio",        icon: "✦", desc: "Gallery & artwork" },
+    { id: "lighting",  label: "Mood & Lighting",   icon: "◎", desc: "Color & atmosphere" },
+    { id: "guestbook", label: "Guestbook",         icon: "✉", desc: "Community notes" },
+    { id: "feedback",  label: "Feedback",          icon: "◈", desc: "Critic dashboard" },
   ];
-
   return (
     <>
       <AnimatePresence>
@@ -176,14 +170,12 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
             onClick={onClose} />
         )}
       </AnimatePresence>
-
       <AnimatePresence>
         {isOpen && (
           <motion.aside key="drawer"
             className="fixed top-0 right-0 h-full w-full max-w-sm z-50 flex flex-col overflow-y-auto"
             style={{ background: "#FFFFFF", color: "#000000" }}
             variants={drawerVariants as any} initial="hidden" animate="visible" exit="exit">
-
             <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-zinc-100">
               <div>
                 <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">Navigation</p>
@@ -194,16 +186,14 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
                 <span className="text-black text-xl leading-none">×</span>
               </button>
             </div>
-
             <div className="px-6 py-6 border-b border-zinc-100">
-               <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
-                 <p className="font-bold text-sm text-black mb-1">Free Mode Active</p>
-                 <p className="text-xs text-zinc-500 leading-relaxed">
-                   You can browse the gallery, control the lighting, write guestbook entries, and leave design critics without signing in.
-                 </p>
-               </div>
+              <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+                <p className="font-bold text-sm text-black mb-1">Free Mode Active</p>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Browse the gallery, control lighting, write guestbook entries, and leave design critiques without signing in.
+                </p>
+              </div>
             </div>
-
             <nav className="px-6 py-6 flex-1">
               <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400 mb-3">Spaces</p>
               <div className="space-y-1">
@@ -217,14 +207,13 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
                     <span className="text-base flex-shrink-0">{icon}</span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold">{label}</p>
-                      <p className={`text-xs mt-0.5 ${activeSection === id ? "text-zinc-400" : "text-zinc-400"}`}>{desc}</p>
+                      <p className="text-xs mt-0.5 text-zinc-400">{desc}</p>
                     </div>
                     {activeSection === id && <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />}
                   </motion.button>
                 ))}
               </div>
             </nav>
-
             <div className="px-6 py-4 border-t border-zinc-100">
               <p className="text-xs text-zinc-300 text-center">© 2026 3D Mood · For 3D Designers</p>
             </div>
@@ -239,12 +228,81 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
 //  3D WEBGL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── GLTF loader: clone → normalize in useMemo (visible on first frame) ────────
-function GLTFModel({ url, wireframe }: { url: string; wireframe: boolean }) {
+// ── Default Sculpture: shown when no file is loaded ───────────────────────────
+function DefaultSculpture() {
+  const groupRef  = useRef<THREE.Group>(null!);
+  const ring1Ref  = useRef<THREE.Mesh>(null!);
+  const ring2Ref  = useRef<THREE.Mesh>(null!);
+  const ring3Ref  = useRef<THREE.Mesh>(null!);
+
+  useFrame((_, delta) => {
+    if (groupRef.current) groupRef.current.rotation.y += delta * 0.25;
+    if (ring1Ref.current) ring1Ref.current.rotation.z += delta * 0.8;
+    if (ring2Ref.current) ring2Ref.current.rotation.x += delta * 0.6;
+    if (ring3Ref.current) ring3Ref.current.rotation.y += delta * 1.0;
+  });
+
+  return (
+    <group ref={groupRef}>
+      {/* Core torus knot */}
+      <mesh castShadow receiveShadow>
+        <torusKnotGeometry args={[0.9, 0.3, 256, 24, 2, 3]} />
+        <meshStandardMaterial
+          color="#c0c0c0" metalness={0.85} roughness={0.1} envMapIntensity={1.8}
+        />
+      </mesh>
+
+      {/* Orbital ring 1 */}
+      <mesh ref={ring1Ref} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <torusGeometry args={[1.8, 0.04, 16, 128]} />
+        <meshStandardMaterial color="#888" metalness={0.9} roughness={0.05} />
+      </mesh>
+
+      {/* Orbital ring 2 */}
+      <mesh ref={ring2Ref} rotation={[Math.PI / 4, Math.PI / 4, 0]} castShadow>
+        <torusGeometry args={[2.1, 0.025, 16, 128]} />
+        <meshStandardMaterial color="#666" metalness={0.9} roughness={0.05} />
+      </mesh>
+
+      {/* Orbital ring 3 */}
+      <mesh ref={ring3Ref} rotation={[0, Math.PI / 3, Math.PI / 6]} castShadow>
+        <torusGeometry args={[2.4, 0.018, 16, 128]} />
+        <meshStandardMaterial color="#555" metalness={0.9} roughness={0.08} />
+      </mesh>
+
+      {/* Floating spheres at cardinal points */}
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const angle = (i / 6) * Math.PI * 2;
+        return (
+          <mesh key={i}
+            position={[Math.cos(angle) * 1.8, Math.sin(angle) * 0.4, Math.sin(angle) * 1.8]}
+            castShadow>
+            <sphereGeometry args={[0.08, 32, 32]} />
+            <meshStandardMaterial color="#fff" metalness={1} roughness={0} envMapIntensity={2} />
+          </mesh>
+        );
+      })}
+
+      {/* Pedestal */}
+      <mesh position={[0, -1.6, 0]} receiveShadow castShadow>
+        <cylinderGeometry args={[0.8, 1.1, 0.18, 64]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.6} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, -1.72, 0]} receiveShadow>
+        <cylinderGeometry args={[1.1, 1.3, 0.08, 64]} />
+        <meshStandardMaterial color="#111" metalness={0.4} roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
+// ── GLTF model: clone in useMemo so first frame is always correct ─────────────
+function GLTFModel({
+  url, wireframe, metalness, roughness,
+}: { url: string; wireframe: boolean; metalness: number; roughness: number }) {
   const { scene } = useGLTF(url);
 
-  // Clone so we NEVER mutate the useGLTF internal cache.
-  // useMemo runs synchronously before the first render → model is always visible.
+  // Deep-clone + normalize (center + 2-unit scale) in useMemo
   const normalized = useMemo(() => {
     const cloned = scene.clone(true);
     cloned.updateMatrixWorld(true);
@@ -261,7 +319,7 @@ function GLTFModel({ url, wireframe }: { url: string; wireframe: boolean }) {
       cloned.position.set(-center.x * s, -center.y * s, -center.z * s);
     }
 
-    // Clone materials so wireframe changes don't leak across instances
+    // Clone materials for independent control
     cloned.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -282,24 +340,33 @@ function GLTFModel({ url, wireframe }: { url: string; wireframe: boolean }) {
     return cloned;
   }, [scene]);
 
-  // Wireframe toggle — no need to re-clone
+  // Update material props when sliders change
   useEffect(() => {
     normalized.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       mats.forEach((m) => {
-        (m as any).wireframe = wireframe;
-        (m as THREE.MeshStandardMaterial).needsUpdate = true;
+        const std = m as THREE.MeshStandardMaterial;
+        if (std.isMeshStandardMaterial) {
+          std.metalness  = metalness;
+          std.roughness  = roughness;
+          std.wireframe  = wireframe;
+          std.needsUpdate = true;
+        } else {
+          (m as any).wireframe = wireframe;
+        }
       });
     });
-  }, [normalized, wireframe]);
+  }, [normalized, wireframe, metalness, roughness]);
 
   return <primitive object={normalized} />;
 }
 
-// ── OBJ loader: clone → normalize in useMemo ──────────────────────────────────
-function OBJModel({ url, wireframe }: { url: string; wireframe: boolean }) {
+// ── OBJ model: same pattern ───────────────────────────────────────────────────
+function OBJModel({
+  url, wireframe, metalness, roughness,
+}: { url: string; wireframe: boolean; metalness: number; roughness: number }) {
   const obj = useLoader(OBJLoader, url);
 
   const normalized = useMemo(() => {
@@ -319,7 +386,7 @@ function OBJModel({ url, wireframe }: { url: string; wireframe: boolean }) {
     }
 
     const baseMat = new THREE.MeshStandardMaterial({
-      color: 0xcccccc, roughness: 0.45, metalness: 0.1, envMapIntensity: 1.0,
+      color: 0xcccccc, metalness, roughness, envMapIntensity: 1.0,
     });
     cloned.traverse((child) => {
       const mesh = child as THREE.Mesh;
@@ -335,53 +402,57 @@ function OBJModel({ url, wireframe }: { url: string; wireframe: boolean }) {
     normalized.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
-      (mesh.material as THREE.MeshStandardMaterial).wireframe   = wireframe;
-      (mesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
+      const std = mesh.material as THREE.MeshStandardMaterial;
+      std.metalness  = metalness;
+      std.roughness  = roughness;
+      std.wireframe  = wireframe;
+      std.needsUpdate = true;
     });
-  }, [normalized, wireframe]);
+  }, [normalized, wireframe, metalness, roughness]);
 
   return <primitive object={normalized} />;
 }
 
-function ModelMesh({ url, ext, wireframe }: { url: string; ext: string; wireframe: boolean }) {
-  return ext === "obj"
-    ? <OBJModel url={url} wireframe={wireframe} />
-    : <GLTFModel url={url} wireframe={wireframe} />;
+function ModelMesh({ url, ext, wireframe, metalness, roughness }: {
+  url: string; ext: string; wireframe: boolean; metalness: number; roughness: number;
+}) {
+  if (ext === "obj") return <OBJModel url={url} wireframe={wireframe} metalness={metalness} roughness={roughness} />;
+  return <GLTFModel url={url} wireframe={wireframe} metalness={metalness} roughness={roughness} />;
 }
 
-
-// ── Turntable auto-rotate ─────────────────────────────────────────────────────
-function Turntable({ active, speed = 0.4 }: { active: boolean; speed?: number }) {
-  const { camera } = useThree();
-  useFrame((_, delta) => {
-    if (!active) return;
-    // Rotate camera around Y axis keeping the same distance
-    const angle = speed * delta;
-    const x = camera.position.x * Math.cos(angle) + camera.position.z * Math.sin(angle);
-    const z = -camera.position.x * Math.sin(angle) + camera.position.z * Math.cos(angle);
-    camera.position.set(x, camera.position.y, z);
-    camera.lookAt(0, 0, 0);
-  });
-  return null;
-}
-
-// ── Zoom along look direction ─────────────────────────────────────────────────
+// ── Zoom along camera direction ───────────────────────────────────────────────
 function ZoomRig({ mult }: { mult: number }) {
-  // base camera distance is ~3 units (matches initial camera position)
-  const BASE = 3.5;
+  const BASE   = 3.5;
   const target = BASE * mult;
   const { camera } = useThree();
   useFrame(() => {
     const cur = camera.position.length();
     if (Math.abs(cur - target) < 0.005) return;
-    const scale = THREE.MathUtils.lerp(cur, target, 0.1) / cur;
-    camera.position.multiplyScalar(scale);
+    camera.position.multiplyScalar(
+      THREE.MathUtils.lerp(cur, target, 0.1) / cur
+    );
   });
   return null;
 }
 
-// ── Photorealistic studio lighting ────────────────────────────────────────────
-// Model is always 2 units → fixed light distances
+// ── Camera preset snap ────────────────────────────────────────────────────────
+function CameraPresetRig({ preset }: { preset: CamPreset }) {
+  const { camera } = useThree();
+  const prev = useRef<CamPreset>("perspective");
+  useEffect(() => {
+    if (prev.current === preset) return;
+    prev.current = preset;
+    const d = Math.max(camera.position.length(), 2);
+    if      (preset === "front") camera.position.set(0,   0,  d);
+    else if (preset === "side")  camera.position.set(d,   0,  0);
+    else if (preset === "top")   camera.position.set(0,   d,  0.001);
+    else                         camera.position.set(d * 0.65, d * 0.38, d);
+    camera.lookAt(0, 0, 0);
+  }, [preset, camera]);
+  return null;
+}
+
+// ── Photorealistic mood lighting (fixed for 2-unit models) ───────────────────
 function MoodLight({ lighting }: { lighting: LightingState }) {
   const { intensity, color, angle, direction } = lighting;
 
@@ -392,9 +463,9 @@ function MoodLight({ lighting }: { lighting: LightingState }) {
     direction === "left"  ? [-6,   3,  0  ] :
                             [6,    3,  0  ];
 
-  const mainInt = (intensity / 100) * 12;   // Fixed scale (model is always 2 units)
-  const fillInt = (intensity / 100) * 2.0;
-  const rimInt  = (intensity / 100) * 1.2;
+  const mainInt = (intensity / 100) * 14;
+  const fillInt = (intensity / 100) * 2.5;
+  const rimInt  = (intensity / 100) * 1.5;
 
   return (
     <>
@@ -413,68 +484,61 @@ function MoodLight({ lighting }: { lighting: LightingState }) {
         shadow-camera-near={0.1}
         shadow-camera-far={30}
         decay={2}
-        distance={25}
+        distance={28}
       />
 
-      {/* Soft fill */}
       <directionalLight
         position={[-pos[0] * 0.5, pos[1] * 0.4, -pos[2] * 0.5]}
         color={color} intensity={fillInt}
       />
-
-      {/* Cool blue rim */}
       <directionalLight
-        position={[pos[0] * 0.1, 1.5, -5]}
+        position={[pos[0] * 0.1, 1.5, -6]}
         color="#a0c0ff" intensity={rimInt}
       />
     </>
   );
 }
 
-// ── Camera preset mover ───────────────────────────────────────────────────────
-type CamPreset = "perspective" | "front" | "side" | "top";
-function CameraPresetRig({ preset }: { preset: CamPreset }) {
-  const { camera } = useThree();
-  const prev = useRef<CamPreset>("perspective");
-  useEffect(() => {
-    if (prev.current === preset) return;
-    prev.current = preset;
-    const d = camera.position.length() || 3.5;
-    if (preset === "front")       camera.position.set(0, 0, d);
-    else if (preset === "side")   camera.position.set(d, 0, 0);
-    else if (preset === "top")    camera.position.set(0, d, 0.001);
-    else                          camera.position.set(d * 0.65, d * 0.38, d);
-    camera.lookAt(0, 0, 0);
-  }, [preset, camera]);
-  return null;
-}
-
-
-
 // ─────────────────────────────────────────────────────────────────────────────
-//  HERO CANVAS — Full Screen (100vh)
+//  HERO CANVAS
 // ─────────────────────────────────────────────────────────────────────────────
 interface HeroCanvasProps {
-  lighting: LightingState;
-  criticMode: boolean;
-  onCanvasClick: (x: number, y: number, clientX: number, clientY: number) => void;
-  fileUrl: string | null;
-  fileExt: string | null;
-  fileName: string | null;
-  onFileUpload: (file: File) => void;
+  lighting:        LightingState;
+  criticMode:      boolean;
+  onCanvasClick:   (x: number, y: number, clientX: number, clientY: number) => void;
+  fileUrl:         string | null;
+  fileExt:         string | null;
+  fileName:        string | null;
+  onFileUpload:    (file: File) => void;
 }
-function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fileName, onFileUpload }: HeroCanvasProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
 
-  const [zoomMult, setZoomMult]         = useState(1);
-  const [wireframe, setWireframe]       = useState(false);
-  const [turntable, setTurntable]       = useState(false);
-  const [camPreset, setCamPreset]       = useState<CamPreset>("perspective");
+function HeroCanvas({
+  lighting, criticMode, onCanvasClick,
+  fileUrl, fileExt, fileName, onFileUpload,
+}: HeroCanvasProps) {
+  const [isDragOver,  setIsDragOver]  = useState(false);
+  const canvasRef    = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Viewport controls
+  const [zoomMult,    setZoomMult]    = useState(1);
+  const [wireframe,   setWireframe]   = useState(false);
+  const [autoRotate,  setAutoRotate]  = useState(false);
+  const [camPreset,   setCamPreset]   = useState<CamPreset>("perspective");
+  // Material controls
+  const [metalness,   setMetalness]   = useState(0.5);
+  const [roughness,   setRoughness]   = useState(0.45);
   const isDraggingZoom = useRef(false);
 
-  useEffect(() => { setZoomMult(1); setWireframe(false); setTurntable(false); setCamPreset("perspective"); }, [fileUrl]);
+  // Reset controls on new file
+  useEffect(() => {
+    setZoomMult(1);
+    setWireframe(false);
+    setAutoRotate(false);
+    setCamPreset("perspective");
+    setMetalness(0.5);
+    setRoughness(0.45);
+  }, [fileUrl]);
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault(); setIsDragOver(false);
@@ -489,27 +553,30 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
     if (!criticMode) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+    const x = Math.round(((e.clientX - rect.left)  / rect.width)  * 100);
+    const y = Math.round(((e.clientY - rect.top)    / rect.height) * 100);
     onCanvasClick(x, y, e.clientX, e.clientY);
   };
-
   const handleZoomDrag = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDraggingZoom.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    // Top = 0.4x (close-up), Bottom = 2.5x (far away)
-    const newMult = 0.4 + relativeY * 2.1;
-    setZoomMult(newMult);
+    const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setZoomMult(0.4 + relY * 2.1);
   };
 
   const { color: sColor, intensity, angle } = lighting;
   const sOpacity = intensity / 100;
 
   return (
-    <div ref={canvasRef} onClick={handleClick}
-      className={`relative w-full h-full overflow-hidden gallery-grid ${criticMode ? "cursor-crosshair" : "cursor-default"}`}
+    <div
+      ref={canvasRef}
+      onClick={handleClick}
+      className={`relative w-full h-full overflow-hidden ${criticMode ? "cursor-crosshair" : "cursor-default"}`}
       style={{ background: "#040404" }}>
+
+      {/* Scanline texture overlay */}
+      <div className="absolute inset-0 pointer-events-none z-[2]"
+        style={{ backgroundImage: "repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px)" }} />
 
       {/* Critic badge */}
       {criticMode && (
@@ -519,200 +586,195 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
         </div>
       )}
 
-      {/* ── WebGL 3D Canvas ── */}
+      {/* ── WebGL Canvas ── */}
       <div className="absolute inset-0 z-10">
-        {fileUrl ? (
-          <Canvas
-            shadows="soft"
-            camera={{ position: [0, 0.5, 3.5], fov: 42 }}
-            gl={{
-              antialias: true,
-              toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.0,
-              outputColorSpace: THREE.SRGBColorSpace,
-            }}
-          >
-            {/* Soft shadows */}
-            <SoftShadows size={12} samples={16} focus={0.85} />
+        <Canvas
+          shadows="soft"
+          camera={{ position: [0, 0.5, 3.5], fov: 42 }}
+          gl={{
+            antialias: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.0,
+            outputColorSpace: THREE.SRGBColorSpace,
+          }}>
+          <SoftShadows size={12} samples={16} focus={0.85} />
+          <Environment preset="warehouse" environmentIntensity={0.4} />
+          <MoodLight lighting={lighting} />
+          <ZoomRig mult={zoomMult} />
+          <CameraPresetRig preset={camPreset} />
 
-            {/* HDR env map for PBR reflections */}
-            <Environment preset="warehouse" environmentIntensity={0.4} />
-
-            {/* Mood lights (fixed scale — model is always 2 units) */}
-            <MoodLight lighting={lighting} />
-
-            {/* Zoom + turntable + camera preset */}
-            <ZoomRig mult={zoomMult} />
-            <Turntable active={turntable} />
-            <CameraPresetRig preset={camPreset} />
-
+          {fileUrl ? (
             <Suspense fallback={null}>
-              <ModelMesh url={fileUrl} ext={fileExt!} wireframe={wireframe} />
-
-              {/* Contact shadow on floor */}
+              <ModelMesh
+                url={fileUrl} ext={fileExt!}
+                wireframe={wireframe} metalness={metalness} roughness={roughness}
+              />
               <ContactShadows
-                position={[0, -1.01, 0]}
-                opacity={0.55}
-                scale={8}
-                blur={2}
-                far={2}
-                color={sColor}
+                position={[0, -1.02, 0]} opacity={0.55}
+                scale={8} blur={2} far={2} color={sColor}
               />
             </Suspense>
+          ) : (
+            <>
+              <DefaultSculpture />
+              <ContactShadows
+                position={[0, -1.8, 0]} opacity={0.4}
+                scale={10} blur={2.5} far={3} color="#888"
+              />
+            </>
+          )}
 
-            <OrbitControls
-              target={[0, 0, 0]}
-              enableZoom={false}
-              enablePan={false}
-              minPolarAngle={0.05}
-              maxPolarAngle={Math.PI * 0.55}
-              rotateSpeed={0.55}
-              dampingFactor={0.07}
-              enableDamping
-              makeDefault
-            />
-          </Canvas>
-        ) : (
-          /* Empty state visual effects (CSS only) */
-          <>
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none z-10 transition-all duration-700"
-              style={{
-                width: `${Math.round(40 + (angle / 90) * 60)}%`, height: "75%",
-                background: `radial-gradient(ellipse 100% 100% at 50% 0%, ${sColor}${Math.round(sOpacity * 220).toString(16).padStart(2, "0")} 0%, ${sColor}20 40%, transparent 70%)`,
-                filter: "blur(1px)", animation: "spotlightPulse 3s ease-in-out infinite",
-              }} />
-            <div className="absolute inset-0 pointer-events-none z-[5]"
-              style={{ background: `radial-gradient(ellipse 80% 60% at 50% 30%, ${sColor}08 0%, transparent 70%)` }} />
-          </>
-        )}
+          <OrbitControls
+            target={[0, 0, 0]}
+            enableZoom={false}
+            enablePan={false}
+            minPolarAngle={0.05}
+            maxPolarAngle={Math.PI * 0.55}
+            rotateSpeed={0.5}
+            dampingFactor={0.07}
+            enableDamping
+            autoRotate={autoRotate}
+            autoRotateSpeed={1.5}
+            makeDefault
+          />
+        </Canvas>
       </div>
 
-      {/* ── Pedestal & Drop Zone (Only show if no file uploaded) ── */}
+      {/* ── Upload drop zone (no file loaded) ── */}
       {!fileUrl && (
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center z-20 pointer-events-auto">
-          <div className="mb-1">
-            <motion.div key="dropzone"
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-              className={`w-72 h-56 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden transition-all duration-300 ${
-                isDragOver ? "border-white/50 scale-105" : "border-white/15 hover:border-white/30"}`}
-              style={{
-                background: isDragOver ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
-                boxShadow: isDragOver ? `0 0 40px ${sColor}20` : "none",
-              }}
-              onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-              onDragLeave={() => setIsDragOver(false)}
-              onDrop={handleDrop}
-              onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-              whileHover={{ scale: 1.01 }}>
-              
-              {isDragOver && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="absolute inset-0 rounded-2xl border border-white/20" />
-              )}
-              
-              <motion.div animate={{ y: isDragOver ? -8 : 0 }}
-                transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-xl border border-white/10 flex items-center justify-center mb-4"
-                  style={{ background: `${sColor}10` }}>
-                  <svg className="w-6 h-6" style={{ color: sColor, opacity: 0.7 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </div>
-                <p className="text-sm font-semibold text-white/60 mb-1">
-                  {isDragOver ? "Drop your 3D file here" : "+ Upload 3D Artwork"}
-                </p>
-                <p className="text-xs text-white/25">.gltf · .obj · .glb</p>
-              </motion.div>
-              <input ref={fileInputRef} type="file" accept=".gltf,.obj,.glb"
-                className="hidden" onChange={handleFileChange} onClick={(e) => e.stopPropagation()} />
+          <motion.div key="dropzone"
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            className={`w-64 h-44 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden transition-all duration-300 ${
+              isDragOver ? "border-white/50 scale-105" : "border-white/15 hover:border-white/30"}`}
+            style={{
+              background: isDragOver ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+              boxShadow: isDragOver ? `0 0 40px ${sColor}20` : "none",
+            }}
+            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            whileHover={{ scale: 1.01 }}>
+            <motion.div animate={{ y: isDragOver ? -8 : 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              className="flex flex-col items-center">
+              <div className="w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center mb-3"
+                style={{ background: `${sColor}10` }}>
+                <svg className="w-5 h-5" style={{ color: sColor, opacity: 0.7 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-white/60 mb-1">
+                {isDragOver ? "Drop here" : "+ Upload 3D File"}
+              </p>
+              <p className="text-xs text-white/25">.gltf · .glb · .obj</p>
             </motion.div>
-          </div>
-          
-          {/* Pedestal Base Graphics */}
-          <div className="relative" style={{ width: "280px", height: "20px",
+            <input ref={fileInputRef} type="file" accept=".gltf,.glb,.obj"
+              className="hidden" onChange={handleFileChange} onClick={(e) => e.stopPropagation()} />
+          </motion.div>
+          {/* Pedestal graphic */}
+          <div className="relative" style={{
+            width: "260px", height: "18px",
             background: "linear-gradient(180deg, #2e2e2e 0%, #161616 60%, #0c0c0c 100%)",
-            borderRadius: "6px 6px 0 0", boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 -4px 30px ${sColor}12` }}>
+            borderRadius: "6px 6px 0 0",
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 -4px 30px ${sColor}12`,
+          }}>
             <div className="absolute inset-0 rounded-t-md opacity-50"
               style={{ background: `linear-gradient(180deg, ${sColor}12 0%, transparent 100%)` }} />
-            <div className="absolute bottom-0 left-0 right-0 h-px"
-              style={{ background: `linear-gradient(90deg, transparent, ${sColor}35, transparent)` }} />
           </div>
-          <div style={{ width: "300px", height: "10px", background: "linear-gradient(180deg, #0e0e0e 0%, #060606 100%)", borderRadius: "0 0 3px 3px" }} />
+          <div style={{ width: "280px", height: "8px", background: "linear-gradient(180deg, #0e0e0e 0%, #060606 100%)", borderRadius: "0 0 3px 3px" }} />
         </div>
       )}
 
-      {/* ── Custom UI Controls (Only visible when model is loaded) ── */}
+      {/* ── Loaded model controls overlay ── */}
       <AnimatePresence>
         {fileUrl && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
             className="absolute z-30 pointer-events-none" style={{ inset: 0 }}>
-            
-            {/* File info badge */}
+
+            {/* File badge */}
             <div className="absolute top-24 left-6 px-4 py-2 bg-black/50 backdrop-blur-md rounded-lg border border-white/10 pointer-events-auto">
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-0.5">Active Model</p>
               <p className="text-sm font-mono text-white truncate max-w-[200px]">{fileName}</p>
             </div>
 
-            {/* ── Designer Toolbar (bottom left) ── */}
-            <div className="absolute bottom-8 left-6 flex items-center gap-2 pointer-events-auto">
+            {/* ── Designer toolbar (bottom) ── */}
+            <div className="absolute bottom-8 left-6 flex items-center gap-2 pointer-events-auto flex-wrap">
               {/* Camera presets */}
               {(["perspective", "front", "side", "top"] as CamPreset[]).map((p) => (
                 <button key={p}
-                  onClick={() => { setCamPreset(p); setTurntable(false); }}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all ${
+                  onClick={() => { setCamPreset(p); setAutoRotate(false); }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md ${
                     camPreset === p
-                      ? "bg-white text-black"
-                      : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white"
-                  } border border-white/10 backdrop-blur-md`}>
+                      ? "bg-white text-black border-white"
+                      : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                  }`}>
                   {p === "perspective" ? "3D" : p}
                 </button>
               ))}
 
               <div className="w-px h-6 bg-white/10 mx-1" />
 
-              {/* Wireframe toggle */}
-              <button
-                onClick={() => setWireframe(w => !w)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all ${
-                  wireframe ? "bg-cyan-400/20 text-cyan-300 border-cyan-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
-                } border backdrop-blur-md`}>
+              {/* Wireframe */}
+              <button onClick={() => setWireframe(w => !w)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md ${
+                  wireframe
+                    ? "bg-cyan-400/20 text-cyan-300 border-cyan-400/40"
+                    : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                }`}>
                 Wire
               </button>
 
-              {/* Turntable toggle */}
-              <button
-                onClick={() => setTurntable(t => !t)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all ${
-                  turntable ? "bg-violet-400/20 text-violet-300 border-violet-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
-                } border backdrop-blur-md flex items-center gap-1.5`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${turntable ? "bg-violet-400 animate-spin" : "bg-zinc-600"}`} />
-                Turn
+              {/* Auto-Rotate */}
+              <button onClick={() => setAutoRotate(r => !r)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md flex items-center gap-1.5 ${
+                  autoRotate
+                    ? "bg-violet-400/20 text-violet-300 border-violet-400/40"
+                    : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${autoRotate ? "bg-violet-400 animate-ping" : "bg-zinc-600"}`} />
+                Rotate
               </button>
             </div>
 
-            {/* Custom Reverse Triangle Zoom Slider (Right side) */}
+            {/* ── Material sliders (bottom center) ── */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col gap-2 pointer-events-auto
+              px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10"
+              style={{ background: "rgba(0,0,0,0.55)", minWidth: "220px" }}>
+              <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest text-center mb-0.5">Material</p>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-zinc-500 w-16 text-right">Metal</span>
+                <input type="range" min={0} max={100} value={Math.round(metalness * 100)}
+                  onChange={(e) => setMetalness(parseInt(e.target.value) / 100)}
+                  className="flex-1 h-1 accent-white cursor-pointer" />
+                <span className="text-[10px] font-mono text-zinc-400 w-8">{Math.round(metalness * 100)}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-zinc-500 w-16 text-right">Rough</span>
+                <input type="range" min={0} max={100} value={Math.round(roughness * 100)}
+                  onChange={(e) => setRoughness(parseInt(e.target.value) / 100)}
+                  className="flex-1 h-1 accent-white cursor-pointer" />
+                <span className="text-[10px] font-mono text-zinc-400 w-8">{Math.round(roughness * 100)}%</span>
+              </div>
+            </div>
+
+            {/* ── Custom Zoom Slider (right side) ── */}
             <div className="absolute top-1/2 -translate-y-1/2 right-6 h-64 w-12 flex flex-col items-center pointer-events-auto select-none">
               <span className="text-[10px] font-bold text-zinc-500 mb-2 tracking-widest">IN</span>
-              <div
-                className="relative w-full flex-1 flex justify-center cursor-ns-resize"
+              <div className="relative w-full flex-1 flex justify-center cursor-ns-resize"
                 onMouseDown={(e) => { e.preventDefault(); isDraggingZoom.current = true; handleZoomDrag(e); }}
                 onMouseMove={handleZoomDrag}
                 onMouseUp={() => isDraggingZoom.current = false}
-                onMouseLeave={() => isDraggingZoom.current = false}
-              >
-                {/* SVG Triangle: wide top = closer (IN), narrow bottom = further (OUT) */}
+                onMouseLeave={() => isDraggingZoom.current = false}>
                 <svg viewBox="0 0 24 200" preserveAspectRatio="none"
-                  className="absolute inset-0 w-6 h-full m-auto"
-                  style={{ opacity: 0.15 }}>
+                  className="absolute inset-0 w-6 h-full m-auto" style={{ opacity: 0.15 }}>
                   <polygon points="0,0 24,0 12,200" fill="white" />
                 </svg>
-                {/* Thumb — position = (zoomMult - 0.4) / 2.1 */}
                 <motion.div
                   className="absolute left-1/2 -translate-x-1/2 w-8 h-2 bg-white rounded-full shadow-[0_0_12px_rgba(255,255,255,0.6)] pointer-events-none"
                   animate={{ top: `${((zoomMult - 0.4) / 2.1) * 100}%`, translateY: "-50%" }}
-                  transition={{ type: "spring", stiffness: 600, damping: 45 }}
-                />
+                  transition={{ type: "spring", stiffness: 600, damping: 45 }} />
               </div>
               <span className="text-[10px] font-bold text-zinc-500 mt-2 tracking-widest">OUT</span>
             </div>
@@ -720,9 +782,21 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
         )}
       </AnimatePresence>
 
-      {/* Background gradients and scanlines */}
-      <div className="absolute inset-0 pointer-events-none z-[2]"
-        style={{ backgroundImage: "repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px)" }} />
+      {/* Empty-state spotlight glow */}
+      {!fileUrl && (
+        <>
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none z-10 transition-all duration-700"
+            style={{
+              width: `${Math.round(40 + (angle / 90) * 60)}%`, height: "75%",
+              background: `radial-gradient(ellipse 100% 100% at 50% 0%, ${sColor}${Math.round(sOpacity * 220).toString(16).padStart(2, "0")} 0%, ${sColor}20 40%, transparent 70%)`,
+              filter: "blur(1px)", animation: "spotlightPulse 3s ease-in-out infinite",
+            }} />
+          <div className="absolute inset-0 pointer-events-none z-[5]"
+            style={{ background: `radial-gradient(ellipse 80% 60% at 50% 30%, ${sColor}08 0%, transparent 70%)` }} />
+        </>
+      )}
+
+      {/* Bottom gradient fade */}
       <div className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none z-20"
         style={{ background: "linear-gradient(to bottom, transparent, #000)" }} />
 
@@ -731,7 +805,8 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }}>
         <span className="text-[10px] text-white/30 tracking-widest uppercase font-semibold">Scroll</span>
         <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          className="w-[1px] h-8 rounded-full" style={{ background: `linear-gradient(to bottom, ${sColor}60, transparent)` }} />
+          className="w-[1px] h-8 rounded-full"
+          style={{ background: `linear-gradient(to bottom, ${sColor}60, transparent)` }} />
       </motion.div>
     </div>
   );
@@ -758,7 +833,6 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
   return (
     <section ref={sectionRef as React.RefObject<HTMLElement>} id="lighting"
       className="relative bg-black py-24 px-6 lg:px-16">
-
       <div className="absolute top-0 left-0 right-0 h-24 pointer-events-none"
         style={{ background: "linear-gradient(to bottom, #000, transparent)" }} />
 
@@ -774,7 +848,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
 
       <div className="max-w-6xl mx-auto space-y-12">
 
-        {/* ── Mood Presets ── */}
+        {/* Mood Presets */}
         <div>
           <p className="text-xs font-bold tracking-widest uppercase text-zinc-600 mb-6">Mood Presets</p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -789,7 +863,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
                   style={{
                     background: isActive ? `linear-gradient(135deg, ${preset.gradientFrom}25, ${preset.gradientTo}15)` : "rgba(255,255,255,0.02)",
                     borderColor: isActive ? preset.accentColor + "50" : "rgba(255,255,255,0.05)",
-                    boxShadow: isActive ? `0 0 30px ${preset.accentColor}15` : "none",
+                    boxShadow:   isActive ? `0 0 30px ${preset.accentColor}15` : "none",
                   }}
                   whileHover={{ scale: 1.02, y: -3 }} whileTap={{ scale: 0.98 }}>
                   <div className="absolute top-0 left-0 right-0 h-0.5 transition-opacity duration-300"
@@ -800,7 +874,9 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
                   {isActive && (
                     <motion.div initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }}
                       className="absolute top-3 right-3 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                      style={{ background: preset.accentColor + "25", color: preset.accentColor }}>ACTIVE</motion.div>
+                      style={{ background: preset.accentColor + "25", color: preset.accentColor }}>
+                      ACTIVE
+                    </motion.div>
                   )}
                 </motion.button>
               );
@@ -808,7 +884,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
           </div>
         </div>
 
-        {/* ── Color Swatches & Direction ── */}
+        {/* Color + Direction */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={0}>
             <p className="text-xs font-bold tracking-widest uppercase text-zinc-600 mb-5">Spotlight Color</p>
@@ -825,7 +901,8 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
                   {lighting.color === c && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       className="absolute inset-0 rounded-2xl flex items-center justify-center">
-                      <div className="w-3 h-3 rounded-full" style={{ background: c === "#FFFFFF" || c === "#F0F0F0" ? "#000" : "#fff" }} />
+                      <div className="w-3 h-3 rounded-full"
+                        style={{ background: c === "#FFFFFF" || c === "#F0F0F0" ? "#000" : "#fff" }} />
                     </motion.div>
                   )}
                 </motion.button>
@@ -833,7 +910,6 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
             </div>
           </motion.div>
 
-          {/* New Direction Selector */}
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={1}>
             <p className="text-xs font-bold tracking-widest uppercase text-zinc-600 mb-5">Light Direction</p>
             <div className="flex bg-white/5 rounded-2xl p-1.5 border border-white/10">
@@ -849,7 +925,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
           </motion.div>
         </div>
 
-        {/* ── Sliders ── */}
+        {/* Sliders */}
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={0}
           className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 rounded-2xl border border-white/[0.05]"
           style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -858,7 +934,8 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Intensity</label>
               <span className="text-xs font-mono" style={{ color: lighting.color }}>{lighting.intensity}%</span>
             </div>
-            <input type="range" min={10} max={100} value={lighting.intensity} onChange={(e) => update("intensity", parseInt(e.target.value))} />
+            <input type="range" min={10} max={100} value={lighting.intensity}
+              onChange={(e) => update("intensity", parseInt(e.target.value))} />
             <div className="h-1 rounded-full bg-white/5 overflow-hidden">
               <motion.div className="h-full rounded-full" animate={{ width: `${lighting.intensity}%` }}
                 style={{ background: `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
@@ -869,7 +946,8 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
               <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Spotlight Angle</label>
               <span className="text-xs font-mono" style={{ color: lighting.color }}>{lighting.angle}°</span>
             </div>
-            <input type="range" min={5} max={90} value={lighting.angle} onChange={(e) => update("angle", parseInt(e.target.value))} />
+            <input type="range" min={5} max={90} value={lighting.angle}
+              onChange={(e) => update("angle", parseInt(e.target.value))} />
             <div className="h-1 rounded-full bg-white/5 overflow-hidden">
               <motion.div className="h-full rounded-full" animate={{ width: `${(lighting.angle / 90) * 100}%` }}
                 style={{ background: `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
@@ -878,7 +956,8 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
         </motion.div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent, #030303)" }} />
+      <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+        style={{ background: "linear-gradient(to bottom, transparent, #030303)" }} />
     </section>
   );
 }
@@ -887,12 +966,13 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
 //  GUESTBOOK SECTION
 // ─────────────────────────────────────────────────────────────────────────────
 function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElement | null> }) {
-  const [entries, setEntries] = useState<GuestbookEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: "", content: "", color: GUESTBOOK_COLORS[0] });
+  const [entries,    setEntries]    = useState<GuestbookEntry[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [form,       setForm]       = useState({ name: "", content: "", color: GUESTBOOK_COLORS[0] });
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error,      setError]      = useState<string | null>(null);
 
+  // ── Fetch on mount ──────────────────────────────────────────────────────────
   const fetchEntries = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -903,7 +983,7 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
       if (error) throw error;
       setEntries((data as GuestbookEntry[]) ?? []);
     } catch (err: any) {
-      console.error("[Guestbook] fetch error:", err?.message ?? err);
+      console.error("[Guestbook] fetch:", err?.message ?? err);
     } finally {
       setLoading(false);
     }
@@ -911,29 +991,29 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
 
   useEffect(() => {
     fetchEntries();
+    // Real-time inserts from other clients
     const channel = supabase.channel("guestbook-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "guestbook" }, (payload) => {
         setEntries((prev) => {
           const hasOpt = prev.some((e) => e.optimistic);
-          if (hasOpt) return prev.map((e) => e.optimistic ? { ...(payload.new as GuestbookEntry) } : e);
+          if (hasOpt) return prev.map((e) => e.optimistic ? (payload.new as GuestbookEntry) : e);
           return [payload.new as GuestbookEntry, ...prev];
         });
-      }).subscribe();
+      })
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchEntries]);
 
+  // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.content.trim()) return;
     setSubmitting(true);
     setError(null);
 
-    // Optimistic update — show immediately
     const optimistic: GuestbookEntry = {
-      ...form,
-      id: Date.now(),
-      created_at: new Date().toISOString(),
-      optimistic: true,
+      ...form, id: Date.now(),
+      created_at: new Date().toISOString(), optimistic: true,
     };
     setEntries((prev) => [optimistic, ...prev]);
     const snapshot = { ...form };
@@ -942,13 +1022,8 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
     try {
       const { error: dbErr } = await supabase
         .from("guestbook")
-        .insert({
-          name:    snapshot.name.trim(),
-          content: snapshot.content.trim(),
-          color:   snapshot.color,
-        });
+        .insert({ name: snapshot.name.trim(), content: snapshot.content.trim(), color: snapshot.color });
       if (dbErr) throw dbErr;
-      // Remove optimistic flag — real row will arrive via realtime channel
       setEntries((prev) => prev.map((e) => e.optimistic ? { ...e, optimistic: false } : e));
     } catch (err: any) {
       setError(err?.message ?? "Failed to post. Please try again.");
@@ -959,12 +1034,18 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
   };
 
   return (
-    <section ref={sectionRef as React.RefObject<HTMLElement>} id="guestbook" className="relative py-24 px-6 lg:px-16" style={{ background: "#030303" }}>
-      <div className="absolute top-0 left-0 right-0 h-24 pointer-events-none" style={{ background: "linear-gradient(to bottom, #030303, transparent)" }} />
+    <section ref={sectionRef as React.RefObject<HTMLElement>} id="guestbook"
+      className="relative py-24 px-6 lg:px-16" style={{ background: "#030303" }}>
+      <div className="absolute top-0 left-0 right-0 h-24 pointer-events-none"
+        style={{ background: "linear-gradient(to bottom, #030303, transparent)" }} />
       <div className="max-w-6xl mx-auto">
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp as any} custom={0} className="mb-16">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
+          variants={fadeUp as any} custom={0} className="mb-16">
           <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">Step 03</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-white" style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>Guestbook</h2>
+          <h2 className="text-4xl lg:text-5xl font-bold text-white"
+            style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>
+            Guestbook
+          </h2>
           <p className="text-zinc-500 mt-3 text-lg">Notes from 3D designers worldwide.</p>
         </motion.div>
 
@@ -972,7 +1053,10 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
           <div>
             {loading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {Array.from({ length: 6 }).map((_, i) => <div key={i} className="aspect-square rounded-2xl animate-pulse" style={{ background: GUESTBOOK_COLORS[i % 8] + "30" }} />)}
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="aspect-square rounded-2xl animate-pulse"
+                    style={{ background: GUESTBOOK_COLORS[i % 8] + "30" }} />
+                ))}
               </div>
             ) : entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-32 text-center">
@@ -984,15 +1068,26 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <AnimatePresence>
                   {entries.map((entry, i) => (
-                    <motion.div key={entry.id} initial={{ opacity: 0, scale: 0.8, rotate: -2 }} animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    <motion.div key={entry.id}
+                      initial={{ opacity: 0, scale: 0.8, rotate: -2 }}
+                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
                       transition={{ type: "spring", stiffness: 350, damping: 28, delay: Math.min(i * 0.05, 0.3) }}
-                      className="rounded-2xl p-4 flex flex-col justify-between min-h-[140px] relative overflow-hidden" style={{ background: entry.color }}
+                      className="rounded-2xl p-4 flex flex-col justify-between min-h-[140px] relative overflow-hidden"
+                      style={{ background: entry.color }}
                       whileHover={{ scale: 1.03, rotate: 0.5, y: -2 }}>
-                      {entry.optimistic && <div className="absolute inset-0 bg-white/40 flex items-center justify-center rounded-2xl"><span className="w-5 h-5 border-2 border-zinc-700 border-t-transparent rounded-full animate-spin" /></div>}
+                      {entry.optimistic && (
+                        <div className="absolute inset-0 bg-white/40 flex items-center justify-center rounded-2xl">
+                          <span className="w-5 h-5 border-2 border-zinc-700 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
                       <p className="text-zinc-800 text-sm leading-relaxed font-medium line-clamp-4">{entry.content}</p>
                       <div className="flex items-center justify-between mt-3">
                         <p className="text-xs font-bold text-zinc-600">{entry.name}</p>
-                        {entry.created_at && <p className="text-[10px] text-zinc-500">{new Date(entry.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>}
+                        {entry.created_at && (
+                          <p className="text-[10px] text-zinc-500">
+                            {new Date(entry.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </p>
+                        )}
                       </div>
                     </motion.div>
                   ))}
@@ -1001,22 +1096,31 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
             )}
           </div>
 
-          <motion.form onSubmit={handleSubmit} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={1}
-            className="rounded-2xl p-6 space-y-4 sticky top-24" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <motion.form onSubmit={handleSubmit}
+            initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={1}
+            className="rounded-2xl p-6 space-y-4 sticky top-24"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
             <div>
-              <h3 className="font-bold text-white mb-0.5" style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>Leave a note</h3>
+              <h3 className="font-bold text-white mb-0.5"
+                style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>Leave a note</h3>
               <p className="text-xs text-zinc-500">Your message to the world</p>
             </div>
-            {error && <div className="px-3 py-2 bg-red-900/20 border border-red-500/20 rounded-lg text-xs text-red-400">{error}</div>}
+            {error && (
+              <div className="px-3 py-2 bg-red-900/20 border border-red-500/20 rounded-lg text-xs text-red-400">
+                {error}
+              </div>
+            )}
             <div>
               <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block mb-1.5">Name</label>
-              <input type="text" value={form.name} maxLength={50} placeholder="Your nickname" onChange={(e) => setForm({ ...form, name: e.target.value })}
+              <input type="text" value={form.name} maxLength={50} placeholder="Your nickname"
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="w-full px-3 py-2.5 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/20"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }} />
             </div>
             <div>
               <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block mb-1.5">Message</label>
-              <textarea value={form.content} maxLength={280} rows={4} placeholder="Leave a thoughtful note..." onChange={(e) => setForm({ ...form, content: e.target.value })}
+              <textarea value={form.content} maxLength={280} rows={4} placeholder="Leave a thoughtful note..."
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
                 className="w-full px-3 py-2.5 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/20 resize-none"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }} />
             </div>
@@ -1024,19 +1128,22 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
               <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block mb-2">Note Color</label>
               <div className="flex gap-2 flex-wrap">
                 {GUESTBOOK_COLORS.map((c) => (
-                  <button key={c} type="button" onClick={() => setForm({ ...form, color: c })} className="w-7 h-7 rounded-lg transition-all hover:scale-110" style={{ background: c, boxShadow: form.color === c ? "0 0 0 2px #fff" : "none" }} />
+                  <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
+                    className="w-7 h-7 rounded-lg transition-all hover:scale-110"
+                    style={{ background: c, boxShadow: form.color === c ? "0 0 0 2px #fff" : "none" }} />
                 ))}
               </div>
             </div>
             <motion.button type="submit" disabled={submitting || !form.name.trim() || !form.content.trim()}
               className="w-full py-3 rounded-xl bg-white text-black text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              {submitting ? "Posting..." : "Post Note ✉"}
+              {submitting ? "Posting…" : "Post Note ✉"}
             </motion.button>
           </motion.form>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent, #050505)" }} />
+      <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
+        style={{ background: "linear-gradient(to bottom, transparent, #050505)" }} />
     </section>
   );
 }
@@ -1047,7 +1154,7 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
 function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElement | null> }) {
   const [critics, setCritics] = useState<CriticEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
 
   const fetchCritics = useCallback(async () => {
     try {
@@ -1070,32 +1177,44 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
     const channel = supabase.channel("critics-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "critics" }, (payload) => {
         setCritics((prev) => [payload.new as CriticEntry, ...prev]);
-      }).subscribe();
+      })
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchCritics]);
 
-  const avgRating = critics.length > 0 ? (critics.reduce((a, c) => a + c.rating, 0) / critics.length).toFixed(1) : "—";
-  const topCat = Object.entries(critics.reduce((acc: Record<string, number>, c) => { acc[c.category] = (acc[c.category] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
+  const avgRating = critics.length > 0
+    ? (critics.reduce((a, c) => a + c.rating, 0) / critics.length).toFixed(1) : "—";
+  const topCat = Object.entries(
+    critics.reduce((acc: Record<string, number>, c) => {
+      acc[c.category] = (acc[c.category] || 0) + 1; return acc;
+    }, {})
+  ).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
 
   const stats = [
     { label: "Total Reviews", value: critics.length.toString(), icon: "◈", color: "#A855F7" },
-    { label: "Avg Rating", value: avgRating, icon: "★", color: "#FBBF24" },
-    { label: "Top Category", value: topCat, icon: "▲", color: "#4ADE80" },
-    { label: "Realtime", value: "Live", icon: "◉", color: "#FB923C" },
+    { label: "Avg Rating",    value: avgRating,                  icon: "★", color: "#FBBF24" },
+    { label: "Top Category",  value: topCat,                     icon: "▲", color: "#4ADE80" },
+    { label: "Realtime",      value: "Live",                     icon: "◉", color: "#FB923C" },
   ];
 
   return (
-    <section ref={sectionRef as React.RefObject<HTMLElement>} id="feedback" className="relative py-24 px-6 lg:px-16 pb-32" style={{ background: "#050505" }}>
+    <section ref={sectionRef as React.RefObject<HTMLElement>} id="feedback"
+      className="relative py-24 px-6 lg:px-16 pb-32" style={{ background: "#050505" }}>
       <div className="max-w-6xl mx-auto">
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp as any} custom={0} className="mb-16">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
+          variants={fadeUp as any} custom={0} className="mb-16">
           <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">Step 04</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-white" style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>Feedback Dashboard</h2>
+          <h2 className="text-4xl lg:text-5xl font-bold text-white"
+            style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>
+            Feedback Dashboard
+          </h2>
           <p className="text-zinc-500 mt-3 text-lg">Critic annotations from the 3D studio canvas.</p>
         </motion.div>
-        
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {stats.map((s, i) => (
-            <motion.div key={s.label} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={i}
+            <motion.div key={s.label}
+              initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={i}
               className="rounded-2xl p-5 border border-white/[0.04]" style={{ background: "rgba(255,255,255,0.02)" }}>
               <p className="text-2xl mb-2">{s.icon}</p>
               <p className="text-3xl font-bold font-mono" style={{ color: s.color }}>{s.value}</p>
@@ -1108,11 +1227,14 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
           className="rounded-2xl overflow-hidden border border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
           <div className="px-6 py-4 border-b border-white/[0.05] flex items-center justify-between">
             <h3 className="text-sm font-bold text-white">Design Evaluations</h3>
-            <button onClick={fetchCritics} className="text-xs text-zinc-600 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">↻ Refresh</button>
+            <button onClick={fetchCritics}
+              className="text-xs text-zinc-600 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">
+              ↻ Refresh
+            </button>
           </div>
           {error && <div className="px-6 py-4 text-sm text-red-400 bg-red-900/10">{error}</div>}
           {loading ? (
-            <div className="px-6 py-16 text-center text-zinc-700 text-sm">Loading...</div>
+            <div className="px-6 py-16 text-center text-zinc-700 text-sm">Loading…</div>
           ) : critics.length === 0 ? (
             <div className="px-6 py-20 text-center">
               <p className="text-4xl mb-3">◈</p>
@@ -1123,20 +1245,32 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/[0.04]">
-                    {["ID", "Name", "Pos", "Category", "Comment", "Rating", "Date"].map((h) => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-zinc-600 uppercase tracking-wider">{h}</th>)}
+                    {["ID", "Name", "Pos", "Category", "Comment", "Rating", "Date"].map((h) => (
+                      <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-zinc-600 uppercase tracking-wider">{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   <AnimatePresence>
                     {critics.map((c) => (
-                      <motion.tr key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="border-b border-white/[0.02] hover:bg-white/[0.02]">
+                      <motion.tr key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        className="border-b border-white/[0.02] hover:bg-white/[0.02]">
                         <td className="px-5 py-3 text-zinc-700 font-mono text-xs">#{c.id}</td>
                         <td className="px-5 py-3 text-white font-bold text-xs">{c.name || "Anon"}</td>
                         <td className="px-5 py-3 text-zinc-500 font-mono text-xs">({c.x_coord},{c.y_coord})</td>
-                        <td className="px-5 py-3"><span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.06] text-zinc-300">{c.category}</span></td>
+                        <td className="px-5 py-3">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.06] text-zinc-300">
+                            {c.category}
+                          </span>
+                        </td>
                         <td className="px-5 py-3 text-zinc-300 text-xs max-w-[220px] truncate">{c.comment}</td>
-                        <td className="px-5 py-3 text-xs"><span className="text-yellow-400">{"★".repeat(c.rating)}</span><span className="text-zinc-800">{"★".repeat(5 - c.rating)}</span></td>
-                        <td className="px-5 py-3 text-zinc-700 text-xs whitespace-nowrap">{new Date(c.created_at!).toLocaleDateString()}</td>
+                        <td className="px-5 py-3 text-xs">
+                          <span className="text-yellow-400">{"★".repeat(c.rating)}</span>
+                          <span className="text-zinc-800">{"★".repeat(5 - c.rating)}</span>
+                        </td>
+                        <td className="px-5 py-3 text-zinc-700 text-xs whitespace-nowrap">
+                          {new Date(c.created_at!).toLocaleDateString()}
+                        </td>
                       </motion.tr>
                     ))}
                   </AnimatePresence>
@@ -1154,13 +1288,14 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
 //  CRITIC POPOVER
 // ─────────────────────────────────────────────────────────────────────────────
 interface CriticPopoverProps {
-  popover: PopoverState; onClose: () => void;
+  popover: PopoverState;
+  onClose: () => void;
   onSubmit: (data: Omit<CriticEntry, "id" | "created_at">) => Promise<void>;
 }
 function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
-  const [form, setForm] = useState({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
+  const [form,       setForm]       = useState({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
   const [submitting, setSubmitting] = useState(false);
-  const [hover, setHover] = useState(0);
+  const [hover,      setHover]      = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1178,17 +1313,18 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
       setForm({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
       onClose();
     } catch (err: any) {
-      console.error("[CriticPopover] submit error:", err?.message ?? err);
+      console.error("[CriticPopover]", err?.message ?? err);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const left = typeof window !== "undefined" ? Math.min(popover.x, window.innerWidth - 290) : popover.x;
-  const top = typeof window !== "undefined" ? Math.min(popover.y, window.innerHeight - 420) : popover.y;
+  const left = typeof window !== "undefined" ? Math.min(popover.x, window.innerWidth  - 290) : popover.x;
+  const top  = typeof window !== "undefined" ? Math.min(popover.y, window.innerHeight - 420) : popover.y;
 
   return (
-    <motion.div key="critic-popover" variants={popoverVariants as any} initial="hidden" animate="visible" exit="exit"
+    <motion.div key="critic-popover"
+      variants={popoverVariants as any} initial="hidden" animate="visible" exit="exit"
       className="fixed z-50 w-72 rounded-2xl overflow-hidden shadow-2xl"
       style={{ left, top, background: "rgba(10,10,10,0.97)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(20px)" }}>
       <form onSubmit={handleSubmit}>
@@ -1205,7 +1341,8 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
         <div className="p-4 space-y-3">
           <div>
             <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider block mb-1.5">Nickname</label>
-            <input type="text" value={form.name} maxLength={30} placeholder="Your name" onChange={(e) => setForm({ ...form, name: e.target.value })}
+            <input type="text" value={form.name} maxLength={30} placeholder="Your name"
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="w-full px-3 py-2 rounded-lg text-xs text-white placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-white/20"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }} />
           </div>
@@ -1219,7 +1356,8 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
           </div>
           <div>
             <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider block mb-1.5">Comment</label>
-            <textarea value={form.comment} rows={3} maxLength={300} placeholder="Share your evaluation..." onChange={(e) => setForm({ ...form, comment: e.target.value })}
+            <textarea value={form.comment} rows={3} maxLength={300} placeholder="Share your evaluation..."
+              onChange={(e) => setForm({ ...form, comment: e.target.value })}
               className="w-full px-3 py-2 rounded-lg text-xs text-white placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-white/20 resize-none"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }} />
           </div>
@@ -1227,17 +1365,21 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
             <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider block mb-1.5">Rating</label>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} type="button" onClick={() => setForm({ ...form, rating: star })}
+                <button key={star} type="button"
+                  onClick={() => setForm({ ...form, rating: star })}
                   onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(0)}
                   className="text-2xl leading-none transition-transform hover:scale-125"
-                  style={{ color: star <= (hover || form.rating) ? "#FBBF24" : "#27272a" }}>★</button>
+                  style={{ color: star <= (hover || form.rating) ? "#FBBF24" : "#27272a" }}>
+                  ★
+                </button>
               ))}
             </div>
           </div>
-          <motion.button type="submit" disabled={submitting || !form.name.trim() || !form.comment.trim()}
+          <motion.button type="submit"
+            disabled={submitting || !form.name.trim() || !form.comment.trim()}
             className="w-full py-2.5 rounded-lg bg-white text-black text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed"
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            {submitting ? "Submitting..." : "Submit Review"}
+            {submitting ? "Submitting…" : "Submit Review"}
           </motion.button>
         </div>
       </form>
@@ -1249,34 +1391,39 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [criticMode, setCriticMode] = useState(false);
-  const [activeSection, setActiveSection] = useState("studio");
-  
-  // File state for 3D model
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [fileExt, setFileExt] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  
-  const [lighting, setLighting] = useState<LightingState>({ intensity: 70, color: "#FFFFFF", angle: 60, direction: "top" });
-  const [popover, setPopover] = useState<PopoverState>({ visible: false, x: 0, y: 0, canvasX: 0, canvasY: 0 });
+  const [drawerOpen,     setDrawerOpen]     = useState(false);
+  const [criticMode,     setCriticMode]     = useState(false);
+  const [activeSection,  setActiveSection]  = useState("studio");
+  const [fileUrl,        setFileUrl]        = useState<string | null>(null);
+  const [fileExt,        setFileExt]        = useState<string | null>(null);
+  const [fileName,       setFileName]       = useState<string | null>(null);
+  const [lighting,       setLighting]       = useState<LightingState>({
+    intensity: 70, color: "#FFFFFF", angle: 60, direction: "top",
+  });
+  const [popover, setPopover] = useState<PopoverState>({
+    visible: false, x: 0, y: 0, canvasX: 0, canvasY: 0,
+  });
 
-  const studioRef = useRef<HTMLElement | null>(null);
-  const lightingRef = useRef<HTMLElement | null>(null);
+  const studioRef    = useRef<HTMLElement | null>(null);
+  const lightingRef  = useRef<HTMLElement | null>(null);
   const guestbookRef = useRef<HTMLElement | null>(null);
-  const feedbackRef = useRef<HTMLElement | null>(null);
+  const feedbackRef  = useRef<HTMLElement | null>(null);
 
+  // Section intersection observer
   useEffect(() => {
-    const refs = [{ id: "studio", ref: studioRef }, { id: "lighting", ref: lightingRef }, { id: "guestbook", ref: guestbookRef }, { id: "feedback", ref: feedbackRef }];
+    const refs = [
+      { id: "studio",    ref: studioRef },
+      { id: "lighting",  ref: lightingRef },
+      { id: "guestbook", ref: guestbookRef },
+      { id: "feedback",  ref: feedbackRef },
+    ];
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const found = refs.find((r) => r.ref.current === entry.target);
-            if (found) setActiveSection(found.id);
-          }
-        });
-      },
+      (entries) => entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const found = refs.find((r) => r.ref.current === entry.target);
+          if (found) setActiveSection(found.id);
+        }
+      }),
       { rootMargin: "-40% 0px -40% 0px", threshold: 0 }
     );
     refs.forEach(({ ref }) => { if (ref.current) observer.observe(ref.current); });
@@ -1284,7 +1431,10 @@ export default function ThreeDMoodApp() {
   }, []);
 
   const scrollToSection = (id: string) => {
-    const refMap: Record<string, React.RefObject<HTMLElement | null>> = { studio: studioRef, lighting: lightingRef, guestbook: guestbookRef, feedback: feedbackRef };
+    const refMap: Record<string, React.RefObject<HTMLElement | null>> = {
+      studio: studioRef, lighting: lightingRef,
+      guestbook: guestbookRef, feedback: feedbackRef,
+    };
     refMap[id]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -1305,76 +1455,126 @@ export default function ThreeDMoodApp() {
       });
       if (error) throw error;
     } catch (err: any) {
-      console.error("[Critics] insert error:", err?.message ?? err);
+      console.error("[Critics] insert:", err?.message ?? err);
+      throw err; // re-throw so CriticPopover can handle
     }
   };
-  
+
   const handleFileUpload = (file: File) => {
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    if (['gltf', 'glb', 'obj'].includes(ext)) {
-      if (fileUrl) URL.revokeObjectURL(fileUrl);
-      const url = URL.createObjectURL(file);
-      setFileUrl(url);
-      setFileExt(ext);
-      setFileName(file.name);
-    } else {
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!["gltf", "glb", "obj"].includes(ext)) {
       alert("Only .gltf, .glb, and .obj files are supported.");
+      return;
     }
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
+    const url = URL.createObjectURL(file);
+    setFileUrl(url);
+    setFileExt(ext);
+    setFileName(file.name);
   };
 
   return (
     <div className="min-h-screen bg-black overflow-x-hidden">
+      {/* ── Fixed Header ── */}
       <header className="fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10"
-        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <motion.button onClick={() => scrollToSection("studio")} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0"><span className="text-black text-xs font-black">3D</span></div>
-          <span className="font-bold tracking-tight text-white text-lg" style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>3D Mood</span>
-          <span className="hidden sm:block text-[10px] text-zinc-600 border border-zinc-800 px-2 py-0.5 rounded-full font-mono">for designers</span>
+        style={{
+          background: "rgba(0,0,0,0.75)",
+          backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+        }}>
+        <motion.button onClick={() => scrollToSection("studio")}
+          initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
+            <span className="text-black text-xs font-black">3D</span>
+          </div>
+          <span className="font-bold tracking-tight text-white text-lg"
+            style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>3D Mood</span>
+          <span className="hidden sm:block text-[10px] text-zinc-600 border border-zinc-800 px-2 py-0.5 rounded-full font-mono">
+            for designers
+          </span>
         </motion.button>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="hidden lg:flex items-center gap-2">
+
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
+          className="hidden lg:flex items-center gap-2">
           {["studio", "lighting", "guestbook", "feedback"].map((id) => (
-            <button key={id} onClick={() => scrollToSection(id)} className="flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-300 group"
+            <button key={id} onClick={() => scrollToSection(id)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-300 group"
               style={{ background: activeSection === id ? "rgba(255,255,255,0.08)" : "transparent" }}>
               <span className="rounded-full transition-all duration-300 flex-shrink-0"
-                style={{ width: activeSection === id ? "6px" : "4px", height: activeSection === id ? "6px" : "4px", background: activeSection === id ? "#fff" : "rgba(255,255,255,0.2)" }} />
-              <span className={`text-[10px] font-semibold transition-all duration-300 ${activeSection === id ? "text-white opacity-100" : "text-zinc-600 opacity-0 group-hover:opacity-100"}`}>
+                style={{
+                  width:  activeSection === id ? "6px" : "4px",
+                  height: activeSection === id ? "6px" : "4px",
+                  background: activeSection === id ? "#fff" : "rgba(255,255,255,0.2)",
+                }} />
+              <span className={`text-[10px] font-semibold transition-all duration-300 ${
+                activeSection === id ? "text-white opacity-100" : "text-zinc-600 opacity-0 group-hover:opacity-100"
+              }`}>
                 {id === "studio" ? "3D Studio" : id === "lighting" ? "Mood" : id === "guestbook" ? "Guestbook" : "Feedback"}
               </span>
             </button>
           ))}
         </motion.div>
-        <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="flex items-center gap-3">
-          <CriticModeSwitch enabled={criticMode} onToggle={() => { setCriticMode(!criticMode); if (!criticMode) scrollToSection("studio"); }} />
+
+        <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="flex items-center gap-3">
+          <CriticModeSwitch
+            enabled={criticMode}
+            onToggle={() => { setCriticMode(!criticMode); if (!criticMode) scrollToSection("studio"); }}
+          />
           <HamburgerButton isOpen={drawerOpen} onClick={() => setDrawerOpen(!drawerOpen)} />
         </motion.div>
       </header>
 
-      <NavigationDrawer isOpen={drawerOpen} activeSection={activeSection} onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)} />
+      <NavigationDrawer
+        isOpen={drawerOpen} activeSection={activeSection}
+        onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)}
+      />
 
+      {/* ── Hero 3D Studio ── */}
       <section ref={studioRef} id="studio" className="relative" style={{ height: "100vh" }}>
         <div className="sticky top-16 w-full" style={{ height: "calc(100vh - 64px)" }}>
-          <HeroCanvas lighting={lighting} criticMode={criticMode} onCanvasClick={handleCanvasClick}
-            fileUrl={fileUrl} fileExt={fileExt} fileName={fileName} onFileUpload={handleFileUpload} />
+          <HeroCanvas
+            lighting={lighting} criticMode={criticMode}
+            onCanvasClick={handleCanvasClick}
+            fileUrl={fileUrl} fileExt={fileExt} fileName={fileName}
+            onFileUpload={handleFileUpload}
+          />
         </div>
       </section>
 
-      <LightingSection lighting={lighting} onChange={setLighting} sectionRef={lightingRef} />
+      <LightingSection  lighting={lighting} onChange={setLighting} sectionRef={lightingRef} />
       <GuestbookSection sectionRef={guestbookRef} />
-      <FeedbackSection sectionRef={feedbackRef} />
+      <FeedbackSection  sectionRef={feedbackRef} />
 
+      {/* Critic Popover */}
       <AnimatePresence>
-        {popover.visible && <CriticPopover key="popover" popover={popover} onClose={() => setPopover((p) => ({ ...p, visible: false }))} onSubmit={handleCriticSubmit} />}
+        {popover.visible && (
+          <CriticPopover
+            key="popover"
+            popover={popover}
+            onClose={() => setPopover((p) => ({ ...p, visible: false }))}
+            onSubmit={handleCriticSubmit}
+          />
+        )}
       </AnimatePresence>
 
+      {/* Footer */}
       <footer className="border-t border-white/[0.03] px-6 lg:px-10 py-8" style={{ background: "#050505" }}>
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-700">
           <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded bg-white flex items-center justify-center"><span className="text-black text-[9px] font-black">3D</span></div>
+            <div className="w-6 h-6 rounded bg-white flex items-center justify-center">
+              <span className="text-black text-[9px] font-black">3D</span>
+            </div>
             <span>© 2026 3D Mood · Free Mode</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />WebGL Powered</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              WebGL Powered
+            </span>
             <span className="text-zinc-800">·</span>
             <span>Built for 3D designers</span>
           </div>
