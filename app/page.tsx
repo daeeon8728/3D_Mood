@@ -239,210 +239,172 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
 //  3D WEBGL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Types
-interface FitState { radius: number; baseDistance: number; }
+// Helper: normalize any Object3D so its bbox center = world origin, max dim = 2
+function normalizeObject(obj: THREE.Object3D) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = new THREE.Vector3();
+  const size   = new THREE.Vector3();
+  box.getCenter(center);
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const s = 2.0 / maxDim;
+  obj.scale.setScalar(s);
+  // After scaling, center in world space is center*s → offset position
+  obj.position.set(-center.x * s, -center.y * s, -center.z * s);
+}
 
-// ── GLTF: enable shadows + keep original materials ───────────────────────────
-function GLTFModel({ url }: { url: string }) {
+// ── GLTF loader ───────────────────────────────────────────────────────────────
+function GLTFModel({ url, wireframe }: { url: string; wireframe: boolean }) {
   const { scene } = useGLTF(url);
   useEffect(() => {
+    normalizeObject(scene);
     scene.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.castShadow = true;
+      mesh.castShadow    = true;
       mesh.receiveShadow = true;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       mats.forEach((m: THREE.Material) => {
         const std = m as THREE.MeshStandardMaterial;
         if (std.isMeshStandardMaterial) {
+          std.wireframe      = wireframe;
           std.envMapIntensity = 1.0;
-          std.needsUpdate = true;
+          std.needsUpdate    = true;
+        } else {
+          // Fallback for non-standard materials (e.g. MeshBasicMaterial in some GLTFs)
+          (m as any).wireframe = wireframe;
         }
       });
     });
-  }, [scene]);
+  }, [scene, wireframe]);
   return <primitive object={scene} />;
 }
 
-// ── OBJ: auto PBR material ─────────────────────────────────────────────────
-function OBJModel({ url }: { url: string }) {
+// ── OBJ loader ────────────────────────────────────────────────────────────────
+function OBJModel({ url, wireframe }: { url: string; wireframe: boolean }) {
   const obj = useLoader(OBJLoader, url);
   useEffect(() => {
+    normalizeObject(obj);
     obj.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.material = new THREE.MeshStandardMaterial({
-        color: 0xc8c8c8, roughness: 0.5, metalness: 0.1, envMapIntensity: 1.0,
+        color: 0xcccccc, roughness: 0.45, metalness: 0.1,
+        envMapIntensity: 1.0, wireframe,
       });
-      mesh.castShadow = true;
+      mesh.castShadow    = true;
       mesh.receiveShadow = true;
     });
-  }, [obj]);
+  }, [obj, wireframe]);
   return <primitive object={obj} />;
 }
 
-function ModelMesh({ url, ext }: { url: string; ext: string }) {
-  return ext === "obj" ? <OBJModel url={url} /> : <GLTFModel url={url} />;
+function ModelMesh({ url, ext, wireframe }: { url: string; ext: string; wireframe: boolean }) {
+  return ext === "obj"
+    ? <OBJModel url={url} wireframe={wireframe} />
+    : <GLTFModel url={url} wireframe={wireframe} />;
 }
 
-// ── Smooth zoom along current camera direction ────────────────────────────
-function ZoomRig({ target }: { target: number }) {
+// ── Turntable auto-rotate ─────────────────────────────────────────────────────
+function Turntable({ active, speed = 0.4 }: { active: boolean; speed?: number }) {
   const { camera } = useThree();
-  useFrame(() => {
-    const cur = camera.position.length();
-    if (Math.abs(cur - target) < 0.001) return;
-    camera.position.multiplyScalar(THREE.MathUtils.lerp(cur, target, 0.1) / cur);
+  useFrame((_, delta) => {
+    if (!active) return;
+    // Rotate camera around Y axis keeping the same distance
+    const angle = speed * delta;
+    const x = camera.position.x * Math.cos(angle) + camera.position.z * Math.sin(angle);
+    const z = -camera.position.x * Math.sin(angle) + camera.position.z * Math.cos(angle);
+    camera.position.set(x, camera.position.y, z);
+    camera.lookAt(0, 0, 0);
   });
   return null;
 }
 
-// ── Multi-layer photorealistic studio lighting ───────────────────────────
-function MoodLight({ lighting, radius }: { lighting: LightingState; radius: number }) {
+// ── Zoom along look direction ─────────────────────────────────────────────────
+function ZoomRig({ mult }: { mult: number }) {
+  // base camera distance is ~3 units (matches initial camera position)
+  const BASE = 3.5;
+  const target = BASE * mult;
+  const { camera } = useThree();
+  useFrame(() => {
+    const cur = camera.position.length();
+    if (Math.abs(cur - target) < 0.005) return;
+    const scale = THREE.MathUtils.lerp(cur, target, 0.1) / cur;
+    camera.position.multiplyScalar(scale);
+  });
+  return null;
+}
+
+// ── Photorealistic studio lighting ────────────────────────────────────────────
+// Model is always 2 units → fixed light distances
+function MoodLight({ lighting }: { lighting: LightingState }) {
   const { intensity, color, angle, direction } = lighting;
-  const r = Math.max(radius, 0.5);
-  const ld = r * 4; // light distance
 
   const pos: [number, number, number] =
-    direction === "top"   ? [r * 0.3, ld,       r * 0.3 ] :
-    direction === "front" ? [0,       ld * 0.5, ld      ] :
-    direction === "back"  ? [0,       ld * 0.5, -ld     ] :
-    direction === "left"  ? [-ld,     ld * 0.5, r * 0.2 ] :
-                            [ld,      ld * 0.5, r * 0.2 ];
+    direction === "top"   ? [0.2,  6,  0.2] :
+    direction === "front" ? [0,    3,  6  ] :
+    direction === "back"  ? [0,    3, -6  ] :
+    direction === "left"  ? [-6,   3,  0  ] :
+                            [6,    3,  0  ];
 
-  const mainInt = (intensity / 100) * 55 * r;
-  const fillInt = (intensity / 100) * 8  * r;
-  const rimInt  = (intensity / 100) * 4  * r;
+  const mainInt = (intensity / 100) * 12;   // Fixed scale (model is always 2 units)
+  const fillInt = (intensity / 100) * 2.0;
+  const rimInt  = (intensity / 100) * 1.2;
 
   return (
     <>
-      {/* Ambient sky/ground gradient — prevents pitch-black shadows */}
-      <hemisphereLight color="#c8d8ff" groundColor="#0d0510" intensity={0.45} />
+      <hemisphereLight color="#c8d8ff" groundColor="#0d0510" intensity={0.4} />
 
-      {/* Key spotlight — the mood light, casts crisp shadows */}
       <spotLight
         position={pos}
         target-position={[0, 0, 0]}
-        angle={(Math.min(angle, 68) * Math.PI) / 180}
-        penumbra={0.7}
+        angle={(Math.min(angle, 65) * Math.PI) / 180}
+        penumbra={0.75}
         color={color}
         intensity={mainInt}
         castShadow
         shadow-mapSize={[4096, 4096]}
         shadow-bias={-0.00003}
-        shadow-camera-near={r * 0.1}
-        shadow-camera-far={ld * 4}
+        shadow-camera-near={0.1}
+        shadow-camera-far={30}
         decay={2}
-        distance={ld * 4}
+        distance={25}
       />
 
-      {/* Soft fill — opposite side, coloured, no shadow */}
+      {/* Soft fill */}
       <directionalLight
-        position={[-pos[0] * 0.4, pos[1] * 0.3, -pos[2] * 0.4]}
-        color={color}
-        intensity={fillInt}
+        position={[-pos[0] * 0.5, pos[1] * 0.4, -pos[2] * 0.5]}
+        color={color} intensity={fillInt}
       />
 
-      {/* Cool blue-white rim from behind — separates model from BG */}
+      {/* Cool blue rim */}
       <directionalLight
-        position={[pos[0] * 0.1, r * 0.5, -ld * 0.8]}
-        color="#a0c0ff"
-        intensity={rimInt}
+        position={[pos[0] * 0.1, 1.5, -5]}
+        color="#a0c0ff" intensity={rimInt}
       />
     </>
   );
 }
 
-// ── Full 3D Scene: centering, lights, controls — all in one component ───────
-interface Scene3DProps {
-  url: string;
-  ext: string;
-  lighting: LightingState;
-  zoomMult: number;
-  onFit: (f: FitState) => void;
-  fitState: FitState | null;
-}
-function Scene3D({ url, ext, lighting, zoomMult, onFit, fitState }: Scene3DProps) {
+// ── Camera preset mover ───────────────────────────────────────────────────────
+type CamPreset = "perspective" | "front" | "side" | "top";
+function CameraPresetRig({ preset }: { preset: CamPreset }) {
   const { camera } = useThree();
-  const orbitRef = useRef<any>(null);
-  const { color: sColor } = lighting;
-  const r = fitState?.radius ?? 1;
-  const targetDist = (fitState?.baseDistance ?? 5) * zoomMult;
-
-  return (
-    <>
-      {/* Soft PCSS shadow kernel */}
-      <SoftShadows size={14} samples={20} focus={0.9} />
-
-      {/* HDR environment for PBR reflections */}
-      <Environment preset="warehouse" environmentIntensity={0.35} />
-
-      {/* Mood lights */}
-      <MoodLight lighting={lighting} radius={r} />
-
-      {/* Zoom rig */}
-      {fitState && <ZoomRig target={targetDist} />}
-
-      <Suspense fallback={null}>
-        {/*
-          Center auto-centers its children at world origin.
-          onCentered fires once with bounding sphere after positioning.
-          This is the correct, battle-tested drei pattern.
-        */}
-        <Center
-          onCentered={({ boundingSphere, center }) => {
-            const radius = boundingSphere.radius || 1;
-            const dist = radius * 2.6;
-
-            // Position camera to see the whole model
-            camera.position.set(dist * 0.65, dist * 0.38, dist);
-            camera.near = radius * 0.005;
-            camera.far  = radius * 200;
-            camera.lookAt(0, 0, 0);
-            camera.updateProjectionMatrix();
-
-            // Orbit target = world origin (Center put everything there)
-            if (orbitRef.current) {
-              orbitRef.current.target.set(0, 0, 0);
-              orbitRef.current.update();
-            }
-
-            onFit({ radius, baseDistance: dist });
-          }}
-        >
-          <ModelMesh url={url} ext={ext} />
-        </Center>
-
-        {/* Realistic contact shadow on virtual floor */}
-        <ContactShadows
-          position={[0, -r, 0]}
-          opacity={0.6}
-          scale={r * 7}
-          blur={r * 1.5}
-          far={r * 2.2}
-          color={sColor}
-        />
-      </Suspense>
-
-      {/*
-        OrbitControls — target (0,0,0) = model center (set by Center above)
-        enableDamping gives the smooth deceleration feel
-        rotateSpeed 0.5 so even large models don't fly off screen
-      */}
-      <OrbitControls
-        ref={orbitRef}
-        target={[0, 0, 0]}
-        enableZoom={false}
-        enablePan={false}
-        minPolarAngle={0.05}
-        maxPolarAngle={Math.PI * 0.55}
-        rotateSpeed={0.5}
-        dampingFactor={0.07}
-        enableDamping
-        makeDefault
-      />
-    </>
-  );
+  const prev = useRef<CamPreset>("perspective");
+  useEffect(() => {
+    if (prev.current === preset) return;
+    prev.current = preset;
+    const d = camera.position.length() || 3.5;
+    if (preset === "front")       camera.position.set(0, 0, d);
+    else if (preset === "side")   camera.position.set(d, 0, 0);
+    else if (preset === "top")    camera.position.set(0, d, 0.001);
+    else                          camera.position.set(d * 0.65, d * 0.38, d);
+    camera.lookAt(0, 0, 0);
+  }, [preset, camera]);
+  return null;
 }
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HERO CANVAS — Full Screen (100vh)
@@ -461,11 +423,13 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  const [fitState, setFitState] = useState<FitState | null>(null);
-  const [zoomMult, setZoomMult] = useState(1);
+  const [zoomMult, setZoomMult]         = useState(1);
+  const [wireframe, setWireframe]       = useState(false);
+  const [turntable, setTurntable]       = useState(false);
+  const [camPreset, setCamPreset]       = useState<CamPreset>("perspective");
   const isDraggingZoom = useRef(false);
 
-  useEffect(() => { setFitState(null); setZoomMult(1); }, [fileUrl]);
+  useEffect(() => { setZoomMult(1); setWireframe(false); setTurntable(false); setCamPreset("perspective"); }, [fileUrl]);
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault(); setIsDragOver(false);
@@ -496,8 +460,6 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
 
   const { color: sColor, intensity, angle } = lighting;
   const sOpacity = intensity / 100;
-  const r = fitState?.radius ?? 1;
-  const targetDist = (fitState?.baseDistance ?? 5) * zoomMult;
 
   return (
     <div ref={canvasRef} onClick={handleClick}
@@ -517,21 +479,52 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
         {fileUrl ? (
           <Canvas
             shadows="soft"
-            camera={{ position: [0, 2, 8], fov: 38 }}
+            camera={{ position: [0, 0.5, 3.5], fov: 42 }}
             gl={{
               antialias: true,
               toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.05,
+              toneMappingExposure: 1.0,
               outputColorSpace: THREE.SRGBColorSpace,
             }}
           >
-            <Scene3D
-              url={fileUrl}
-              ext={fileExt!}
-              lighting={lighting}
-              zoomMult={zoomMult}
-              fitState={fitState}
-              onFit={setFitState}
+            {/* Soft shadows */}
+            <SoftShadows size={12} samples={16} focus={0.85} />
+
+            {/* HDR env map for PBR reflections */}
+            <Environment preset="warehouse" environmentIntensity={0.4} />
+
+            {/* Mood lights (fixed scale — model is always 2 units) */}
+            <MoodLight lighting={lighting} />
+
+            {/* Zoom + turntable + camera preset */}
+            <ZoomRig mult={zoomMult} />
+            <Turntable active={turntable} />
+            <CameraPresetRig preset={camPreset} />
+
+            <Suspense fallback={null}>
+              <ModelMesh url={fileUrl} ext={fileExt!} wireframe={wireframe} />
+
+              {/* Contact shadow on floor */}
+              <ContactShadows
+                position={[0, -1.01, 0]}
+                opacity={0.55}
+                scale={8}
+                blur={2}
+                far={2}
+                color={sColor}
+              />
+            </Suspense>
+
+            <OrbitControls
+              target={[0, 0, 0]}
+              enableZoom={false}
+              enablePan={false}
+              minPolarAngle={0.05}
+              maxPolarAngle={Math.PI * 0.55}
+              rotateSpeed={0.55}
+              dampingFactor={0.07}
+              enableDamping
+              makeDefault
             />
           </Canvas>
         ) : (
@@ -616,9 +609,41 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
               <p className="text-sm font-mono text-white truncate max-w-[200px]">{fileName}</p>
             </div>
 
-            {/* Interaction hint */}
-            <div className="absolute bottom-20 left-6 px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded-full border border-white/[0.06] pointer-events-none">
-              <p className="text-[10px] text-zinc-500 font-medium">Drag to rotate · Scroll below to adjust lighting</p>
+            {/* ── Designer Toolbar (bottom left) ── */}
+            <div className="absolute bottom-8 left-6 flex items-center gap-2 pointer-events-auto">
+              {/* Camera presets */}
+              {(["perspective", "front", "side", "top"] as CamPreset[]).map((p) => (
+                <button key={p}
+                  onClick={() => { setCamPreset(p); setTurntable(false); }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all ${
+                    camPreset === p
+                      ? "bg-white text-black"
+                      : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white"
+                  } border border-white/10 backdrop-blur-md`}>
+                  {p === "perspective" ? "3D" : p}
+                </button>
+              ))}
+
+              <div className="w-px h-6 bg-white/10 mx-1" />
+
+              {/* Wireframe toggle */}
+              <button
+                onClick={() => setWireframe(w => !w)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all ${
+                  wireframe ? "bg-cyan-400/20 text-cyan-300 border-cyan-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                } border backdrop-blur-md`}>
+                Wire
+              </button>
+
+              {/* Turntable toggle */}
+              <button
+                onClick={() => setTurntable(t => !t)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all ${
+                  turntable ? "bg-violet-400/20 text-violet-300 border-violet-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                } border backdrop-blur-md flex items-center gap-1.5`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${turntable ? "bg-violet-400 animate-spin" : "bg-zinc-600"}`} />
+                Turn
+              </button>
             </div>
 
             {/* Custom Reverse Triangle Zoom Slider (Right side) */}
