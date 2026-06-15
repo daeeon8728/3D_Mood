@@ -233,12 +233,42 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
   const containerRef = useRef<HTMLDivElement>(null);
   const splineAppRef = useRef<any>(null);
+  const rafRef       = useRef<number | null>(null);
   const [isLoaded,    setIsLoaded]    = useState(false);
   const [mounted,     setMounted]     = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [panelsOpen, setPanelsOpen] = useState({ left: false, right: false });
+  const [zoomLevel,   setZoomLevel]   = useState(1);
 
   const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
+
+  // ── Auto Rotate Simulation via Pointer Drag ───────────────────────────────
+  useEffect(() => {
+    if (!lighting.autoRotate) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+    const canvas = containerRef.current?.querySelector('canvas');
+    if (!canvas) return;
+
+    let x = window.innerWidth / 2;
+    const y = window.innerHeight / 2;
+    
+    // Simulate pointer down to grab the orbit controls
+    canvas.dispatchEvent(new PointerEvent("pointerdown", { clientX: x, clientY: y, buttons: 1, pointerId: 99 }));
+
+    const loop = () => {
+      x -= 2; // rotation speed
+      canvas.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, buttons: 1, pointerId: 99 }));
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    loop();
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      canvas.dispatchEvent(new PointerEvent("pointerup", { clientX: x, clientY: y, pointerId: 99 }));
+    };
+  }, [lighting.autoRotate]);
 
   // SSR guard
   useEffect(() => { 
@@ -406,7 +436,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
         className="absolute inset-0 z-0 transition-all duration-1000"
-        style={{ filter: `brightness(${brightness})` }}>
+        style={{ filter: `brightness(${brightness})`, transform: `scale(${zoomLevel})` }}>
         {mounted && currentScene.type === "spline" && (
           <Spline
             key={currentScene.id}
@@ -613,23 +643,23 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
           <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:30 }} transition={{ duration:0.6, ease:[0.22,1,0.36,1] }}
             className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border border-white/[0.15] shadow-2xl"
             style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
-            <button onClick={() => { splineAppRef.current?.setZoom?.(1); onLightingChange({...lighting, autoRotate:false}); }}
+            <button onClick={() => { setZoomLevel(1); onLightingChange({...lighting, autoRotate:false}); }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
-              정면 뷰
+              Front View
             </button>
-            <button onClick={() => { splineAppRef.current?.setZoom?.(1.5); onLightingChange({...lighting, autoRotate:false}); }}
+            <button onClick={() => { setZoomLevel(1.3); onLightingChange({...lighting, autoRotate:false}); }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
-              디테일 뷰
+              Detail View
             </button>
-            <button onClick={() => { splineAppRef.current?.setZoom?.(1.2); onLightingChange({...lighting, autoRotate:true}); }}
+            <button onClick={() => { setZoomLevel(1.1); onLightingChange({...lighting, autoRotate:!lighting.autoRotate}); }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors flex items-center gap-2">
               <span className={`w-1.5 h-1.5 rounded-full ${lighting.autoRotate?'bg-emerald-400 animate-pulse':'bg-zinc-500'}`} />
-              시네마틱 턴테이블
+              Cinematic Turntable
             </button>
             <div className="w-px h-6 bg-white/20 mx-1" />
-            <button onClick={onTogglePresentation}
+            <button onClick={() => { setZoomLevel(1); onLightingChange({...lighting, autoRotate:false}); onTogglePresentation(); }}
               className="px-4 py-2.5 rounded-full text-xs font-bold text-red-400 hover:bg-red-400/10 transition-colors flex items-center gap-1.5">
-              <span className="text-lg leading-none">×</span> 닫기
+              <span className="text-lg leading-none">×</span> Close
             </button>
           </motion.div>
         )}
