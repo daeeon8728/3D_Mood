@@ -1,13 +1,13 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  3D Mood — Production v3
+//  3D Mood — Production v4
 //  For 3D graphic designers · Full Supabase backend · WebGL studio
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
   useState, useEffect, useRef, useCallback, useMemo, Suspense,
-  DragEvent, ChangeEvent,
+  DragEvent, ChangeEvent, Component,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
@@ -17,17 +17,19 @@ import * as THREE from "three";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
 import {
   useGLTF, OrbitControls, Environment, SoftShadows, ContactShadows,
+  Grid, GizmoHelper, GizmoViewport, Html,
 } from "@react-three/drei";
 import { OBJLoader } from "three-stdlib";
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
-const SUPABASE_URL     = "https://ychptrhmedfjzairkzwh.supabase.co";
+const SUPABASE_URL      = "https://ychptrhmedfjzairkzwh.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_sh92dIOhgb0wew25kly21w_xSLYWdko";
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type LightDir   = "top" | "front" | "back" | "left" | "right";
-type CamPreset  = "perspective" | "front" | "side" | "top";
+type LightDir  = "top" | "front" | "back" | "left" | "right";
+type CamPreset = "perspective" | "front" | "side" | "top";
+type EnvPreset = "warehouse" | "studio" | "city" | "dawn" | "night";
 
 interface LightingState {
   intensity: number; color: string; angle: number; direction: LightDir;
@@ -52,7 +54,7 @@ interface PopoverState {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MOOD_PRESETS: MoodPreset[] = [
   {
-    id: "dawn",   label: "#Dawn",      emoji: "🌅", description: "Warm golden hour",
+    id: "dawn",      label: "#Dawn",      emoji: "🌅", description: "Warm golden hour",
     lighting: { intensity: 75, color: "#FFB347", angle: 35, direction: "top" },
     gradientFrom: "#FF6B35", gradientTo: "#FFB347", accentColor: "#FFB347",
   },
@@ -62,7 +64,7 @@ const MOOD_PRESETS: MoodPreset[] = [
     gradientFrom: "#FF2079", gradientTo: "#00D4FF", accentColor: "#FF2079",
   },
   {
-    id: "minimal", label: "#Minimal", emoji: "◻", description: "Pure white gallery",
+    id: "minimal",   label: "#Minimal",   emoji: "◻", description: "Pure white gallery",
     lighting: { intensity: 60, color: "#F0F0F0", angle: 90, direction: "top" },
     gradientFrom: "#E8E8E8", gradientTo: "#FFFFFF", accentColor: "#CCCCCC",
   },
@@ -84,6 +86,13 @@ const GUESTBOOK_COLORS = [
 const CRITIC_CATEGORIES = [
   "Lighting", "Composition", "Color Theory",
   "Form & Shape", "Texture", "Mood", "Technical",
+];
+const ENV_PRESETS: { id: EnvPreset; label: string; emoji: string }[] = [
+  { id: "warehouse", label: "Studio",   emoji: "🏢" },
+  { id: "studio",    label: "Booth",    emoji: "💡" },
+  { id: "city",      label: "City",     emoji: "🌆" },
+  { id: "dawn",      label: "Dawn",     emoji: "🌅" },
+  { id: "night",     label: "Night",    emoji: "🌙" },
 ];
 
 // ─── Motion Variants ──────────────────────────────────────────────────────────
@@ -156,10 +165,10 @@ interface DrawerProps {
 }
 function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: DrawerProps) {
   const navItems = [
-    { id: "studio",    label: "3D Studio",        icon: "✦", desc: "Gallery & artwork" },
-    { id: "lighting",  label: "Mood & Lighting",   icon: "◎", desc: "Color & atmosphere" },
-    { id: "guestbook", label: "Guestbook",         icon: "✉", desc: "Community notes" },
-    { id: "feedback",  label: "Feedback",          icon: "◈", desc: "Critic dashboard" },
+    { id: "studio",    label: "3D Studio",       icon: "✦", desc: "Gallery & artwork" },
+    { id: "lighting",  label: "Mood & Lighting",  icon: "◎", desc: "Color & atmosphere" },
+    { id: "guestbook", label: "Guestbook",        icon: "✉", desc: "Community notes" },
+    { id: "feedback",  label: "Feedback",         icon: "◈", desc: "Critic dashboard" },
   ];
   return (
     <>
@@ -179,7 +188,7 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
             <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-zinc-100">
               <div>
                 <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">Navigation</p>
-                <p className="text-xl font-bold text-black mt-0.5" style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>3D Mood</p>
+                <p className="text-xl font-bold text-black mt-0.5">3D Mood</p>
               </div>
               <button id="drawer-close-btn" onClick={onClose}
                 className="w-9 h-9 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center transition-colors">
@@ -190,7 +199,7 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
               <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
                 <p className="font-bold text-sm text-black mb-1">Free Mode Active</p>
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  Browse the gallery, control lighting, write guestbook entries, and leave design critiques without signing in.
+                  Browse, control lighting, write guestbook entries, and leave design critiques without signing in.
                 </p>
               </div>
             </div>
@@ -225,65 +234,79 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  ERROR BOUNDARY  (catches silent GLTF/WebGL errors)
+// ─────────────────────────────────────────────────────────────────────────────
+interface EBState { hasError: boolean; message: string; }
+class ModelErrorBoundary extends Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  EBState
+> {
+  state: EBState = { hasError: false, message: "" };
+  static getDerivedStateFromError(err: Error): EBState {
+    return { hasError: true, message: err.message ?? "Load error" };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback ?? (
+          <Html center>
+            <div style={{ color: "#f87171", fontSize: 11, textAlign: "center", maxWidth: 180 }}>
+              ⚠ Could not load model<br />
+              <span style={{ color: "#71717a", fontSize: 10 }}>{this.state.message}</span>
+            </div>
+          </Html>
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  3D WEBGL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Default Sculpture: shown when no file is loaded ───────────────────────────
+// ── Default Sculpture ─────────────────────────────────────────────────────────
 function DefaultSculpture() {
-  const groupRef  = useRef<THREE.Group>(null!);
-  const ring1Ref  = useRef<THREE.Mesh>(null!);
-  const ring2Ref  = useRef<THREE.Mesh>(null!);
-  const ring3Ref  = useRef<THREE.Mesh>(null!);
+  const groupRef = useRef<THREE.Group>(null!);
+  const r1       = useRef<THREE.Mesh>(null!);
+  const r2       = useRef<THREE.Mesh>(null!);
+  const r3       = useRef<THREE.Mesh>(null!);
 
   useFrame((_, delta) => {
-    if (groupRef.current) groupRef.current.rotation.y += delta * 0.25;
-    if (ring1Ref.current) ring1Ref.current.rotation.z += delta * 0.8;
-    if (ring2Ref.current) ring2Ref.current.rotation.x += delta * 0.6;
-    if (ring3Ref.current) ring3Ref.current.rotation.y += delta * 1.0;
+    if (groupRef.current) groupRef.current.rotation.y += delta * 0.22;
+    if (r1.current)       r1.current.rotation.z += delta * 0.7;
+    if (r2.current)       r2.current.rotation.x += delta * 0.55;
+    if (r3.current)       r3.current.rotation.y += delta * 0.9;
   });
 
   return (
     <group ref={groupRef}>
-      {/* Core torus knot */}
       <mesh castShadow receiveShadow>
         <torusKnotGeometry args={[0.9, 0.3, 256, 24, 2, 3]} />
-        <meshStandardMaterial
-          color="#c0c0c0" metalness={0.85} roughness={0.1} envMapIntensity={1.8}
-        />
+        <meshStandardMaterial color="#c0c0c0" metalness={0.85} roughness={0.1} envMapIntensity={1.8} />
       </mesh>
-
-      {/* Orbital ring 1 */}
-      <mesh ref={ring1Ref} rotation={[Math.PI / 2, 0, 0]} castShadow>
+      <mesh ref={r1} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <torusGeometry args={[1.8, 0.04, 16, 128]} />
         <meshStandardMaterial color="#888" metalness={0.9} roughness={0.05} />
       </mesh>
-
-      {/* Orbital ring 2 */}
-      <mesh ref={ring2Ref} rotation={[Math.PI / 4, Math.PI / 4, 0]} castShadow>
+      <mesh ref={r2} rotation={[Math.PI / 4, Math.PI / 4, 0]} castShadow>
         <torusGeometry args={[2.1, 0.025, 16, 128]} />
         <meshStandardMaterial color="#666" metalness={0.9} roughness={0.05} />
       </mesh>
-
-      {/* Orbital ring 3 */}
-      <mesh ref={ring3Ref} rotation={[0, Math.PI / 3, Math.PI / 6]} castShadow>
+      <mesh ref={r3} rotation={[0, Math.PI / 3, Math.PI / 6]} castShadow>
         <torusGeometry args={[2.4, 0.018, 16, 128]} />
         <meshStandardMaterial color="#555" metalness={0.9} roughness={0.08} />
       </mesh>
-
-      {/* Floating spheres at cardinal points */}
-      {[0, 1, 2, 3, 4, 5].map((i) => {
-        const angle = (i / 6) * Math.PI * 2;
+      {[0,1,2,3,4,5].map((i) => {
+        const a = (i / 6) * Math.PI * 2;
         return (
-          <mesh key={i}
-            position={[Math.cos(angle) * 1.8, Math.sin(angle) * 0.4, Math.sin(angle) * 1.8]}
-            castShadow>
+          <mesh key={i} position={[Math.cos(a) * 1.8, Math.sin(a) * 0.4, Math.sin(a) * 1.8]} castShadow>
             <sphereGeometry args={[0.08, 32, 32]} />
             <meshStandardMaterial color="#fff" metalness={1} roughness={0} envMapIntensity={2} />
           </mesh>
         );
       })}
-
-      {/* Pedestal */}
       <mesh position={[0, -1.6, 0]} receiveShadow castShadow>
         <cylinderGeometry args={[0.8, 1.1, 0.18, 64]} />
         <meshStandardMaterial color="#1a1a1a" metalness={0.6} roughness={0.4} />
@@ -296,53 +319,100 @@ function DefaultSculpture() {
   );
 }
 
-// ── GLTF model: clone in useMemo so first frame is always correct ─────────────
+// ── Poly count display ────────────────────────────────────────────────────────
+function PolyStats({ object }: { object: THREE.Object3D | null }) {
+  const [tris, setTris] = useState(0);
+  const [verts, setVerts] = useState(0);
+
+  useEffect(() => {
+    if (!object) { setTris(0); setVerts(0); return; }
+    let t = 0, v = 0;
+    object.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      const geo = mesh.geometry as THREE.BufferGeometry;
+      v += (geo.attributes.position?.count ?? 0);
+      t += geo.index ? geo.index.count / 3 : v / 3;
+    });
+    setTris(Math.round(t));
+    setVerts(Math.round(v));
+  }, [object]);
+
+  if (!object) return null;
+  return (
+    <Html position={[0, 1.5, 0]} center style={{ pointerEvents: "none" }}>
+      <div style={{
+        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8,
+        padding: "6px 12px", fontSize: 10, color: "#a1a1aa", fontFamily: "monospace",
+        display: "flex", gap: 12, whiteSpace: "nowrap",
+      }}>
+        <span>▲ {tris.toLocaleString()} tris</span>
+        <span>● {verts.toLocaleString()} verts</span>
+      </div>
+    </Html>
+  );
+}
+
+// ── GLTF model: useFrame bbox normalization (most reliable) ───────────────────
 function GLTFModel({
-  url, wireframe, metalness, roughness,
-}: { url: string; wireframe: boolean; metalness: number; roughness: number }) {
+  url, wireframe, metalness, roughness, showPoly,
+}: { url: string; wireframe: boolean; metalness: number; roughness: number; showPoly: boolean }) {
   const { scene } = useGLTF(url);
+  const groupRef  = useRef<THREE.Group>(null!);
+  const fitted    = useRef(false);
 
-  // Deep-clone + normalize (center + 2-unit scale) in useMemo
-  const normalized = useMemo(() => {
-    const cloned = scene.clone(true);
-    cloned.updateMatrixWorld(true);
-
-    const box = new THREE.Box3().setFromObject(cloned);
-    if (!box.isEmpty()) {
-      const center = new THREE.Vector3();
-      const size   = new THREE.Vector3();
-      box.getCenter(center);
-      box.getSize(size);
-      const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const s = 2.0 / maxDim;
-      cloned.scale.setScalar(s);
-      cloned.position.set(-center.x * s, -center.y * s, -center.z * s);
-    }
-
-    // Clone materials for independent control
-    cloned.traverse((child) => {
+  // Clone + clone materials (never touch useGLTF cache)
+  const clone = useMemo(() => {
+    const c = scene.clone(true);
+    c.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow    = true;
       mesh.receiveShadow = true;
       if (Array.isArray(mesh.material)) {
         mesh.material = mesh.material.map((m) => {
-          const c = m.clone() as THREE.MeshStandardMaterial;
-          if (c.isMeshStandardMaterial) c.envMapIntensity = 1.0;
-          return c;
+          const cm = m.clone() as THREE.MeshStandardMaterial;
+          if (cm.isMeshStandardMaterial) cm.envMapIntensity = 1.0;
+          return cm;
         });
       } else {
-        const c = (mesh.material as THREE.Material).clone() as THREE.MeshStandardMaterial;
-        if (c.isMeshStandardMaterial) c.envMapIntensity = 1.0;
-        mesh.material = c;
+        const cm = (mesh.material as THREE.Material).clone() as THREE.MeshStandardMaterial;
+        if (cm.isMeshStandardMaterial) cm.envMapIntensity = 1.0;
+        mesh.material = cm;
       }
     });
-    return cloned;
+    return c;
   }, [scene]);
 
-  // Update material props when sliders change
+  // Reset fitted flag when new file loads
+  useEffect(() => { fitted.current = false; }, [clone]);
+
+  // Normalize size+position on FIRST frame (after Three.js has set up geometry)
+  useFrame(() => {
+    if (fitted.current || !groupRef.current) return;
+    fitted.current = true;
+
+    const box = new THREE.Box3().setFromObject(groupRef.current);
+    if (box.isEmpty()) return;
+
+    const size   = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim <= 0) return;
+
+    const s = 2.0 / maxDim;
+    groupRef.current.scale.setScalar(s);
+    groupRef.current.position.set(
+      -center.x * s,
+      -center.y * s,
+      -center.z * s,
+    );
+  });
+
+  // Material updates
   useEffect(() => {
-    normalized.traverse((child) => {
+    clone.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -358,48 +428,57 @@ function GLTFModel({
         }
       });
     });
-  }, [normalized, wireframe, metalness, roughness]);
+  }, [clone, wireframe, metalness, roughness]);
 
-  return <primitive object={normalized} />;
+  return (
+    <group ref={groupRef}>
+      <primitive object={clone} />
+      {showPoly && <PolyStats object={clone} />}
+    </group>
+  );
 }
 
-// ── OBJ model: same pattern ───────────────────────────────────────────────────
+// ── OBJ model ─────────────────────────────────────────────────────────────────
 function OBJModel({
-  url, wireframe, metalness, roughness,
-}: { url: string; wireframe: boolean; metalness: number; roughness: number }) {
-  const obj = useLoader(OBJLoader, url);
+  url, wireframe, metalness, roughness, showPoly,
+}: { url: string; wireframe: boolean; metalness: number; roughness: number; showPoly: boolean }) {
+  const obj      = useLoader(OBJLoader, url);
+  const groupRef = useRef<THREE.Group>(null!);
+  const fitted   = useRef(false);
 
-  const normalized = useMemo(() => {
-    const cloned = obj.clone(true);
-    cloned.updateMatrixWorld(true);
-
-    const box = new THREE.Box3().setFromObject(cloned);
-    if (!box.isEmpty()) {
-      const center = new THREE.Vector3();
-      const size   = new THREE.Vector3();
-      box.getCenter(center);
-      box.getSize(size);
-      const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const s = 2.0 / maxDim;
-      cloned.scale.setScalar(s);
-      cloned.position.set(-center.x * s, -center.y * s, -center.z * s);
-    }
-
-    const baseMat = new THREE.MeshStandardMaterial({
+  const clone = useMemo(() => {
+    const c = obj.clone(true);
+    const mat = new THREE.MeshStandardMaterial({
       color: 0xcccccc, metalness, roughness, envMapIntensity: 1.0,
     });
-    cloned.traverse((child) => {
+    c.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.material      = baseMat.clone();
+      mesh.material      = mat.clone();
       mesh.castShadow    = true;
       mesh.receiveShadow = true;
     });
-    return cloned;
+    return c;
   }, [obj]);
 
+  useEffect(() => { fitted.current = false; }, [clone]);
+
+  useFrame(() => {
+    if (fitted.current || !groupRef.current) return;
+    fitted.current = true;
+    const box = new THREE.Box3().setFromObject(groupRef.current);
+    if (box.isEmpty()) return;
+    const size   = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim <= 0) return;
+    const s = 2.0 / maxDim;
+    groupRef.current.scale.setScalar(s);
+    groupRef.current.position.set(-center.x * s, -center.y * s, -center.z * s);
+  });
+
   useEffect(() => {
-    normalized.traverse((child) => {
+    clone.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       const std = mesh.material as THREE.MeshStandardMaterial;
@@ -408,31 +487,23 @@ function OBJModel({
       std.wireframe  = wireframe;
       std.needsUpdate = true;
     });
-  }, [normalized, wireframe, metalness, roughness]);
+  }, [clone, wireframe, metalness, roughness]);
 
-  return <primitive object={normalized} />;
+  return (
+    <group ref={groupRef}>
+      <primitive object={clone} />
+      {showPoly && <PolyStats object={clone} />}
+    </group>
+  );
 }
 
-function ModelMesh({ url, ext, wireframe, metalness, roughness }: {
-  url: string; ext: string; wireframe: boolean; metalness: number; roughness: number;
+function ModelMesh(props: {
+  url: string; ext: string; wireframe: boolean;
+  metalness: number; roughness: number; showPoly: boolean;
 }) {
-  if (ext === "obj") return <OBJModel url={url} wireframe={wireframe} metalness={metalness} roughness={roughness} />;
-  return <GLTFModel url={url} wireframe={wireframe} metalness={metalness} roughness={roughness} />;
-}
-
-// ── Zoom along camera direction ───────────────────────────────────────────────
-function ZoomRig({ mult }: { mult: number }) {
-  const BASE   = 3.5;
-  const target = BASE * mult;
-  const { camera } = useThree();
-  useFrame(() => {
-    const cur = camera.position.length();
-    if (Math.abs(cur - target) < 0.005) return;
-    camera.position.multiplyScalar(
-      THREE.MathUtils.lerp(cur, target, 0.1) / cur
-    );
-  });
-  return null;
+  return props.ext === "obj"
+    ? <OBJModel url={props.url} wireframe={props.wireframe} metalness={props.metalness} roughness={props.roughness} showPoly={props.showPoly} />
+    : <GLTFModel url={props.url} wireframe={props.wireframe} metalness={props.metalness} roughness={props.roughness} showPoly={props.showPoly} />;
 }
 
 // ── Camera preset snap ────────────────────────────────────────────────────────
@@ -442,85 +513,95 @@ function CameraPresetRig({ preset }: { preset: CamPreset }) {
   useEffect(() => {
     if (prev.current === preset) return;
     prev.current = preset;
-    const d = Math.max(camera.position.length(), 2);
-    if      (preset === "front") camera.position.set(0,   0,  d);
-    else if (preset === "side")  camera.position.set(d,   0,  0);
-    else if (preset === "top")   camera.position.set(0,   d,  0.001);
+    const d = Math.max(camera.position.length(), 3);
+    if      (preset === "front") camera.position.set(0, 0,   d);
+    else if (preset === "side")  camera.position.set(d, 0,   0);
+    else if (preset === "top")   camera.position.set(0, d,   0.001);
     else                         camera.position.set(d * 0.65, d * 0.38, d);
     camera.lookAt(0, 0, 0);
   }, [preset, camera]);
   return null;
 }
 
-// ── Mood lighting — wide coverage, fills entire monitor ──────────────────────
+// ── Screenshot helper ─────────────────────────────────────────────────────────
+function ScreenshotHelper({
+  trigger, onCapture,
+}: { trigger: number; onCapture: (url: string) => void }) {
+  const { gl } = useThree();
+  useEffect(() => {
+    if (!trigger) return;
+    // Render one extra frame then grab the canvas
+    gl.render(gl.domElement as any, gl.domElement as any);
+    const url = gl.domElement.toDataURL("image/png");
+    onCapture(url);
+  }, [trigger]);
+  return null;
+}
+
+// ── Wide studio lighting — covers full monitor ────────────────────────────────
 function MoodLight({ lighting }: { lighting: LightingState }) {
   const { intensity, color, angle, direction } = lighting;
 
   const pos: [number, number, number] =
-    direction === "top"   ? [0.2,  9,  0.2] :
-    direction === "front" ? [0,    4,  10 ] :
-    direction === "back"  ? [0,    4, -10 ] :
-    direction === "left"  ? [-10,  4,  0  ] :
-                            [10,   4,  0  ];
+    direction === "top"   ? [0.2,  10,  0.2] :
+    direction === "front" ? [0,     5,  12 ] :
+    direction === "back"  ? [0,     5, -12 ] :
+    direction === "left"  ? [-12,   5,  0  ] :
+                            [12,    5,  0  ];
 
-  const mainInt = (intensity / 100) * 20;   // bright key light
-  const sideInt = (intensity / 100) * 6.0;  // wide left+right fills
-  const fillInt = (intensity / 100) * 5.0;  // counter fill
-  const rimInt  = (intensity / 100) * 2.5;  // cool back rim
+  const k  = intensity / 100;
+  const mi = k * 22;   // key
+  const si = k * 8;    // side fill
+  const fi = k * 6;    // counter fill
+  const ri = k * 3;    // rim
 
   return (
     <>
-      {/* Hemisphere — soft ambient base */}
-      <hemisphereLight color="#d2e0ff" groundColor="#12080e" intensity={0.65} />
+      {/* Hemisphere base */}
+      <hemisphereLight color="#d8e8ff" groundColor="#14091a" intensity={0.7} />
 
-      {/* Main key spotlight */}
+      {/* Key spot */}
       <spotLight
-        position={pos}
-        target-position={[0, 0, 0]}
-        angle={(Math.min(angle, 80) * Math.PI) / 180}
-        penumbra={0.85}
-        color={color}
-        intensity={mainInt}
-        castShadow
-        shadow-mapSize={[4096, 4096]}
-        shadow-bias={-0.00003}
-        shadow-camera-near={0.1}
-        shadow-camera-far={50}
-        decay={1.2}
-        distance={50}
+        position={pos} target-position={[0, 0, 0]}
+        angle={(Math.min(angle, 82) * Math.PI) / 180}
+        penumbra={0.9} color={color} intensity={mi}
+        castShadow shadow-mapSize={[4096, 4096]}
+        shadow-bias={-0.00003} shadow-camera-near={0.1}
+        shadow-camera-far={60} decay={1.0} distance={60}
       />
 
-      {/* ─── Wide left fill (covers left half of screen) ─── */}
-      <directionalLight position={[-15, 6, 5]} color={color} intensity={sideInt} />
+      {/* ─── WIDE left fill — left edge of monitor ─── */}
+      <directionalLight position={[-20, 8,  6]} color={color} intensity={si} />
+      {/* ─── WIDE right fill — right edge of monitor ─── */}
+      <directionalLight position={[ 20, 8,  6]} color={color} intensity={si} />
 
-      {/* ─── Wide right fill (covers right half of screen) ─── */}
-      <directionalLight position={[15, 6, 5]} color={color} intensity={sideInt} />
-
-      {/* Soft counter fill opposite to key */}
+      {/* Counter fill (opposite key) */}
       <directionalLight
-        position={[-pos[0] * 0.6, pos[1] * 0.35, -pos[2] * 0.6]}
-        color={color}
-        intensity={fillInt}
+        position={[-pos[0] * 0.7, pos[1] * 0.3, -pos[2] * 0.7]}
+        color={color} intensity={fi}
       />
 
-      {/* Cool blue rim / back light */}
-      <directionalLight position={[0, 4, -14]} color="#7aadff" intensity={rimInt} />
+      {/* Cool rim from behind */}
+      <directionalLight position={[0, 5, -18]} color="#88aaff" intensity={ri} />
+
+      {/* Point lights at far left/right for very wide screens */}
+      <pointLight position={[-18, 3, 0]} color={color} intensity={k * 4} distance={40} decay={1.5} />
+      <pointLight position={[ 18, 3, 0]} color={color} intensity={k * 4} distance={40} decay={1.5} />
     </>
   );
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  HERO CANVAS
 // ─────────────────────────────────────────────────────────────────────────────
 interface HeroCanvasProps {
-  lighting:        LightingState;
-  criticMode:      boolean;
-  onCanvasClick:   (x: number, y: number, clientX: number, clientY: number) => void;
-  fileUrl:         string | null;
-  fileExt:         string | null;
-  fileName:        string | null;
-  onFileUpload:    (file: File) => void;
+  lighting:      LightingState;
+  criticMode:    boolean;
+  onCanvasClick: (x: number, y: number, clientX: number, clientY: number) => void;
+  fileUrl:       string | null;
+  fileExt:       string | null;
+  fileName:      string | null;
+  onFileUpload:  (file: File) => void;
 }
 
 function HeroCanvas({
@@ -530,25 +611,23 @@ function HeroCanvas({
   const [isDragOver,  setIsDragOver]  = useState(false);
   const canvasRef    = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const glRef        = useRef<THREE.WebGLRenderer | null>(null);
 
-  // Viewport controls
-  const [zoomMult,    setZoomMult]    = useState(1);
+  // ── Controls state ──
   const [wireframe,   setWireframe]   = useState(false);
   const [autoRotate,  setAutoRotate]  = useState(false);
   const [camPreset,   setCamPreset]   = useState<CamPreset>("perspective");
-  // Material controls
   const [metalness,   setMetalness]   = useState(0.5);
   const [roughness,   setRoughness]   = useState(0.45);
-  const isDraggingZoom = useRef(false);
+  const [showGrid,    setShowGrid]    = useState(false);
+  const [showAxes,    setShowAxes]    = useState(false);
+  const [showPoly,    setShowPoly]    = useState(false);
+  const [envPreset,   setEnvPreset]   = useState<EnvPreset>("warehouse");
+  const [screenshotT, setScreenshotT] = useState(0);
 
-  // Reset controls on new file
   useEffect(() => {
-    setZoomMult(1);
-    setWireframe(false);
-    setAutoRotate(false);
-    setCamPreset("perspective");
-    setMetalness(0.5);
-    setRoughness(0.45);
+    setWireframe(false); setAutoRotate(false); setCamPreset("perspective");
+    setMetalness(0.5);   setRoughness(0.45);
   }, [fileUrl]);
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -559,6 +638,7 @@ function HeroCanvas({
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) onFileUpload(file);
+    e.target.value = "";
   };
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!criticMode) return;
@@ -568,11 +648,14 @@ function HeroCanvas({
     const y = Math.round(((e.clientY - rect.top)    / rect.height) * 100);
     onCanvasClick(x, y, e.clientX, e.clientY);
   };
-  const handleZoomDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingZoom.current) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    setZoomMult(0.4 + relY * 2.1);
+  const handleScreenshot = () => {
+    setScreenshotT(Date.now());
+  };
+  const handleCapture = (dataUrl: string) => {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `3d-mood-${Date.now()}.png`;
+    a.click();
   };
 
   const { color: sColor, intensity, angle } = lighting;
@@ -585,9 +668,9 @@ function HeroCanvas({
       className={`relative w-full h-full overflow-hidden ${criticMode ? "cursor-crosshair" : "cursor-default"}`}
       style={{ background: "#040404" }}>
 
-      {/* Scanline texture overlay */}
+      {/* Scanline */}
       <div className="absolute inset-0 pointer-events-none z-[2]"
-        style={{ backgroundImage: "repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px)" }} />
+        style={{ backgroundImage: "repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px)" }} />
 
       {/* Critic badge */}
       {criticMode && (
@@ -601,35 +684,77 @@ function HeroCanvas({
       <div className="absolute inset-0 z-10">
         <Canvas
           shadows="soft"
-          camera={{ position: [0, 0.5, 3.5], fov: 42 }}
+          camera={{ position: [0, 0.5, 4], fov: 45 }}
           gl={{
             antialias: true,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.0,
+            toneMappingExposure: 1.1,
             outputColorSpace: THREE.SRGBColorSpace,
-          }}>
-          <SoftShadows size={12} samples={16} focus={0.85} />
-          <Environment preset="warehouse" environmentIntensity={0.4} />
+            preserveDrawingBuffer: true,   // needed for screenshot
+          }}
+          onCreated={({ gl }) => { glRef.current = gl; }}>
+
+          <SoftShadows size={14} samples={16} focus={0.85} />
+          <Environment preset={envPreset} environmentIntensity={0.45} />
           <MoodLight lighting={lighting} />
           <CameraPresetRig preset={camPreset} />
+          <ScreenshotHelper trigger={screenshotT} onCapture={handleCapture} />
+
+          {/* Floor grid */}
+          {showGrid && (
+            <Grid
+              position={[0, -1.1, 0]}
+              args={[20, 20]}
+              cellSize={0.5}
+              cellThickness={0.5}
+              cellColor="#333"
+              sectionSize={2}
+              sectionThickness={1}
+              sectionColor="#444"
+              fadeDistance={20}
+              fadeStrength={1}
+              followCamera={false}
+              infiniteGrid={true}
+            />
+          )}
+
+          {/* Axes helper */}
+          {showAxes && (
+            <GizmoHelper alignment="bottom-left" margin={[60, 60]}>
+              <GizmoViewport axisColors={["#ff4060", "#80ff60", "#4080ff"]} labelColor="white" />
+            </GizmoHelper>
+          )}
 
           {fileUrl ? (
-            <Suspense fallback={null}>
-              <ModelMesh
-                url={fileUrl} ext={fileExt!}
-                wireframe={wireframe} metalness={metalness} roughness={roughness}
-              />
-              <ContactShadows
-                position={[0, -1.02, 0]} opacity={0.55}
-                scale={8} blur={2} far={2} color={sColor}
-              />
-            </Suspense>
+            <ModelErrorBoundary fallback={
+              <Html center>
+                <div style={{ color: "#f87171", fontSize: 11, textAlign: "center" }}>
+                  ⚠ Model load failed.<br />Try a .glb file.
+                </div>
+              </Html>
+            }>
+              <Suspense fallback={
+                <Html center>
+                  <div style={{ color: "#a1a1aa", fontSize: 11 }}>Loading…</div>
+                </Html>
+              }>
+                <ModelMesh
+                  url={fileUrl} ext={fileExt!}
+                  wireframe={wireframe} metalness={metalness} roughness={roughness}
+                  showPoly={showPoly}
+                />
+                <ContactShadows
+                  position={[0, -1.05, 0]} opacity={0.55}
+                  scale={10} blur={2.5} far={2.5} color={sColor}
+                />
+              </Suspense>
+            </ModelErrorBoundary>
           ) : (
             <>
               <DefaultSculpture />
               <ContactShadows
                 position={[0, -1.8, 0]} opacity={0.4}
-                scale={10} blur={2.5} far={3} color="#888"
+                scale={12} blur={3} far={3.5} color="#888"
               />
             </>
           )}
@@ -638,8 +763,8 @@ function HeroCanvas({
             target={[0, 0, 0]}
             enableZoom={true}
             zoomSpeed={1.2}
-            minDistance={1.2}
-            maxDistance={12}
+            minDistance={1.0}
+            maxDistance={14}
             enablePan={false}
             minPolarAngle={0.05}
             maxPolarAngle={Math.PI * 0.55}
@@ -653,10 +778,10 @@ function HeroCanvas({
         </Canvas>
       </div>
 
-      {/* ── Upload drop zone (no file loaded) ── */}
+      {/* ── Upload drop zone ── */}
       {!fileUrl && (
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center z-20 pointer-events-auto">
-          <motion.div key="dropzone"
+          <motion.div
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             className={`w-64 h-44 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden transition-all duration-300 ${
               isDragOver ? "border-white/50 scale-105" : "border-white/15 hover:border-white/30"}`}
@@ -686,34 +811,39 @@ function HeroCanvas({
             <input ref={fileInputRef} type="file" accept=".gltf,.glb,.obj"
               className="hidden" onChange={handleFileChange} onClick={(e) => e.stopPropagation()} />
           </motion.div>
-          {/* Pedestal graphic */}
-          <div className="relative" style={{
+          <div style={{
             width: "260px", height: "18px",
             background: "linear-gradient(180deg, #2e2e2e 0%, #161616 60%, #0c0c0c 100%)",
             borderRadius: "6px 6px 0 0",
-            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 -4px 30px ${sColor}12`,
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 -4px 30px ${sColor}15`,
           }}>
-            <div className="absolute inset-0 rounded-t-md opacity-50"
-              style={{ background: `linear-gradient(180deg, ${sColor}12 0%, transparent 100%)` }} />
+            <div className="h-full rounded-t-md opacity-40"
+              style={{ background: `linear-gradient(180deg, ${sColor}18 0%, transparent 100%)` }} />
           </div>
           <div style={{ width: "280px", height: "8px", background: "linear-gradient(180deg, #0e0e0e 0%, #060606 100%)", borderRadius: "0 0 3px 3px" }} />
         </div>
       )}
 
-      {/* ── Loaded model controls overlay ── */}
+      {/* ── Model loaded: controls overlay ── */}
       <AnimatePresence>
         {fileUrl && (
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute z-30 pointer-events-none" style={{ inset: 0 }}>
 
-            {/* File badge */}
-            <div className="absolute top-24 left-6 px-4 py-2 bg-black/50 backdrop-blur-md rounded-lg border border-white/10 pointer-events-auto">
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-0.5">Active Model</p>
-              <p className="text-sm font-mono text-white truncate max-w-[200px]">{fileName}</p>
+            {/* File badge + screenshot */}
+            <div className="absolute top-20 left-6 flex flex-col gap-2 pointer-events-auto">
+              <div className="px-4 py-2 bg-black/55 backdrop-blur-md rounded-lg border border-white/10">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-0.5">Active Model</p>
+                <p className="text-sm font-mono text-white truncate max-w-[200px]">{fileName}</p>
+              </div>
+              <button onClick={handleScreenshot}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[11px] text-zinc-400 hover:text-white hover:bg-white/10 transition-all backdrop-blur-md">
+                <span>📸</span> Screenshot
+              </button>
             </div>
 
-            {/* ── Designer toolbar (bottom) ── */}
-            <div className="absolute bottom-8 left-6 flex items-center gap-2 pointer-events-auto flex-wrap">
+            {/* ── Designer toolbar (bottom left) ── */}
+            <div className="absolute bottom-8 left-6 flex items-center gap-2 pointer-events-auto flex-wrap max-w-[calc(100vw-180px)]">
               {/* Camera presets */}
               {(["perspective", "front", "side", "top"] as CamPreset[]).map((p) => (
                 <button key={p}
@@ -732,9 +862,7 @@ function HeroCanvas({
               {/* Wireframe */}
               <button onClick={() => setWireframe(w => !w)}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md ${
-                  wireframe
-                    ? "bg-cyan-400/20 text-cyan-300 border-cyan-400/40"
-                    : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                  wireframe ? "bg-cyan-400/20 text-cyan-300 border-cyan-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
                 }`}>
                 Wire
               </button>
@@ -742,19 +870,40 @@ function HeroCanvas({
               {/* Auto-Rotate */}
               <button onClick={() => setAutoRotate(r => !r)}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md flex items-center gap-1.5 ${
-                  autoRotate
-                    ? "bg-violet-400/20 text-violet-300 border-violet-400/40"
-                    : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                  autoRotate ? "bg-violet-400/20 text-violet-300 border-violet-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
                 }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${autoRotate ? "bg-violet-400 animate-ping" : "bg-zinc-600"}`} />
                 Rotate
               </button>
+
+              {/* Grid */}
+              <button onClick={() => setShowGrid(g => !g)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md ${
+                  showGrid ? "bg-emerald-400/20 text-emerald-300 border-emerald-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                }`}>
+                Grid
+              </button>
+
+              {/* Axes */}
+              <button onClick={() => setShowAxes(a => !a)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md ${
+                  showAxes ? "bg-orange-400/20 text-orange-300 border-orange-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                }`}>
+                XYZ
+              </button>
+
+              {/* Poly count */}
+              <button onClick={() => setShowPoly(p => !p)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all border backdrop-blur-md ${
+                  showPoly ? "bg-yellow-400/20 text-yellow-300 border-yellow-400/40" : "bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white border-white/10"
+                }`}>
+                △ Poly
+              </button>
             </div>
 
             {/* ── Material sliders (bottom center) ── */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col gap-2 pointer-events-auto
-              px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10"
-              style={{ background: "rgba(0,0,0,0.55)", minWidth: "220px" }}>
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col gap-2 pointer-events-auto px-5 py-3 rounded-2xl backdrop-blur-md border border-white/10"
+              style={{ background: "rgba(0,0,0,0.6)", minWidth: "220px" }}>
               <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest text-center mb-0.5">Material</p>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] text-zinc-500 w-16 text-right">Metal</span>
@@ -772,54 +921,62 @@ function HeroCanvas({
               </div>
             </div>
 
-            {/* ── Custom Zoom Slider (right side) ── */}
-            <div className="absolute top-1/2 -translate-y-1/2 right-6 h-64 w-12 flex flex-col items-center pointer-events-auto select-none">
-              <span className="text-[10px] font-bold text-zinc-500 mb-2 tracking-widest">IN</span>
-              <div className="relative w-full flex-1 flex justify-center cursor-ns-resize"
-                onMouseDown={(e) => { e.preventDefault(); isDraggingZoom.current = true; handleZoomDrag(e); }}
-                onMouseMove={handleZoomDrag}
-                onMouseUp={() => isDraggingZoom.current = false}
-                onMouseLeave={() => isDraggingZoom.current = false}>
-                <svg viewBox="0 0 24 200" preserveAspectRatio="none"
-                  className="absolute inset-0 w-6 h-full m-auto" style={{ opacity: 0.15 }}>
-                  <polygon points="0,0 24,0 12,200" fill="white" />
-                </svg>
-                <motion.div
-                  className="absolute left-1/2 -translate-x-1/2 w-8 h-2 bg-white rounded-full shadow-[0_0_12px_rgba(255,255,255,0.6)] pointer-events-none"
-                  animate={{ top: `${((zoomMult - 0.4) / 2.1) * 100}%`, translateY: "-50%" }}
-                  transition={{ type: "spring", stiffness: 600, damping: 45 }} />
-              </div>
-              <span className="text-[10px] font-bold text-zinc-500 mt-2 tracking-widest">OUT</span>
+            {/* ── Environment preset (bottom right) ── */}
+            <div className="absolute bottom-8 right-6 flex flex-col gap-1.5 pointer-events-auto">
+              <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest text-center">Env</p>
+              {ENV_PRESETS.map((e) => (
+                <button key={e.id} onClick={() => setEnvPreset(e.id)}
+                  title={e.label}
+                  className={`w-9 h-9 rounded-xl text-base flex items-center justify-center transition-all border backdrop-blur-md ${
+                    envPreset === e.id
+                      ? "bg-white/15 border-white/30 scale-110"
+                      : "bg-white/3 border-white/8 hover:bg-white/10 hover:scale-105"
+                  }`}>
+                  {e.emoji}
+                </button>
+              ))}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Empty-state spotlight glow */}
-      {!fileUrl && (
-        <>
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none z-10 transition-all duration-700"
-            style={{
-              width: `${Math.round(40 + (angle / 90) * 60)}%`, height: "75%",
-              background: `radial-gradient(ellipse 100% 100% at 50% 0%, ${sColor}${Math.round(sOpacity * 220).toString(16).padStart(2, "0")} 0%, ${sColor}20 40%, transparent 70%)`,
-              filter: "blur(1px)", animation: "spotlightPulse 3s ease-in-out infinite",
-            }} />
-          <div className="absolute inset-0 pointer-events-none z-[5]"
-            style={{ background: `radial-gradient(ellipse 80% 60% at 50% 30%, ${sColor}08 0%, transparent 70%)` }} />
-        </>
-      )}
+      {/* ── Full-width background glow (always 100% wide) ── */}
+      <>
+        {/* Main cone from top */}
+        <div className="absolute top-0 inset-x-0 pointer-events-none z-[1] transition-all duration-700"
+          style={{
+            height: "90%",
+            background: `radial-gradient(ellipse 120% 100% at 50% 0%, ${sColor}${Math.round(sOpacity * 200).toString(16).padStart(2, "0")} 0%, ${sColor}30 30%, ${sColor}12 55%, transparent 75%)`,
+            filter: "blur(0.5px)",
+          }} />
+        {/* Left edge glow */}
+        <div className="absolute top-0 left-0 pointer-events-none z-[1] transition-all duration-700"
+          style={{
+            width: "45%", height: "100%",
+            background: `radial-gradient(ellipse 100% 80% at 0% 40%, ${sColor}${Math.round(sOpacity * 80).toString(16).padStart(2, "0")} 0%, transparent 70%)`,
+          }} />
+        {/* Right edge glow */}
+        <div className="absolute top-0 right-0 pointer-events-none z-[1] transition-all duration-700"
+          style={{
+            width: "45%", height: "100%",
+            background: `radial-gradient(ellipse 100% 80% at 100% 40%, ${sColor}${Math.round(sOpacity * 80).toString(16).padStart(2, "0")} 0%, transparent 70%)`,
+          }} />
+        {/* Subtle center ambient */}
+        <div className="absolute inset-0 pointer-events-none z-[1]"
+          style={{ background: `radial-gradient(ellipse 90% 60% at 50% 35%, ${sColor}0a 0%, transparent 70%)` }} />
+      </>
 
-      {/* Bottom gradient fade */}
+      {/* Bottom fade */}
       <div className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none z-20"
         style={{ background: "linear-gradient(to bottom, transparent, #000)" }} />
 
       {/* Scroll indicator */}
       <motion.div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }}>
-        <span className="text-[10px] text-white/30 tracking-widest uppercase font-semibold">Scroll</span>
+        <span className="text-[10px] text-white/25 tracking-widest uppercase font-semibold">Scroll</span>
         <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
           className="w-[1px] h-8 rounded-full"
-          style={{ background: `linear-gradient(to bottom, ${sColor}60, transparent)` }} />
+          style={{ background: `linear-gradient(to bottom, ${sColor}50, transparent)` }} />
       </motion.div>
     </div>
   );
@@ -829,17 +986,14 @@ function HeroCanvas({
 //  MOOD & LIGHTING SECTION
 // ─────────────────────────────────────────────────────────────────────────────
 interface LightingSectionProps {
-  lighting: LightingState;
-  onChange: (l: LightingState) => void;
+  lighting:   LightingState;
+  onChange:   (l: LightingState) => void;
   sectionRef: React.RefObject<HTMLElement | null>;
 }
 function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProps) {
   const [activePreset, setActivePreset] = useState<string | null>(null);
 
-  const selectPreset = (preset: MoodPreset) => {
-    setActivePreset(preset.id);
-    onChange(preset.lighting);
-  };
+  const selectPreset = (p: MoodPreset) => { setActivePreset(p.id); onChange(p.lighting); };
   const update = (key: keyof LightingState, value: any) =>
     onChange({ ...lighting, [key]: value });
 
@@ -848,20 +1002,14 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
       className="relative bg-black py-24 px-6 lg:px-16">
       <div className="absolute top-0 left-0 right-0 h-24 pointer-events-none"
         style={{ background: "linear-gradient(to bottom, #000, transparent)" }} />
-
       <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
         variants={fadeUp as any} custom={0} className="max-w-6xl mx-auto mb-16">
         <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">Step 02</p>
-        <h2 className="text-4xl lg:text-5xl font-bold text-white"
-          style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>
-          Set the Mood
-        </h2>
+        <h2 className="text-4xl lg:text-5xl font-bold text-white">Set the Mood</h2>
         <p className="text-zinc-500 mt-3 text-lg">Choose an atmosphere, sculpt your light.</p>
       </motion.div>
-
       <div className="max-w-6xl mx-auto space-y-12">
-
-        {/* Mood Presets */}
+        {/* Mood presets */}
         <div>
           <p className="text-xs font-bold tracking-widest uppercase text-zinc-600 mb-6">Mood Presets</p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -872,7 +1020,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
                   initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
                   variants={fadeUp as any} custom={i}
                   onClick={() => selectPreset(preset)}
-                  className="relative rounded-2xl p-5 text-left border transition-all duration-300 overflow-hidden group"
+                  className="relative rounded-2xl p-5 text-left border transition-all duration-300 overflow-hidden"
                   style={{
                     background: isActive ? `linear-gradient(135deg, ${preset.gradientFrom}25, ${preset.gradientTo}15)` : "rgba(255,255,255,0.02)",
                     borderColor: isActive ? preset.accentColor + "50" : "rgba(255,255,255,0.05)",
@@ -922,7 +1070,6 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
               ))}
             </div>
           </motion.div>
-
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={1}>
             <p className="text-xs font-bold tracking-widest uppercase text-zinc-600 mb-5">Light Direction</p>
             <div className="flex bg-white/5 rounded-2xl p-1.5 border border-white/10">
@@ -948,7 +1095,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
               <span className="text-xs font-mono" style={{ color: lighting.color }}>{lighting.intensity}%</span>
             </div>
             <input type="range" min={10} max={100} value={lighting.intensity}
-              onChange={(e) => update("intensity", parseInt(e.target.value))} />
+              onChange={(e) => update("intensity", parseInt(e.target.value))} className="w-full" />
             <div className="h-1 rounded-full bg-white/5 overflow-hidden">
               <motion.div className="h-full rounded-full" animate={{ width: `${lighting.intensity}%` }}
                 style={{ background: `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
@@ -960,7 +1107,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
               <span className="text-xs font-mono" style={{ color: lighting.color }}>{lighting.angle}°</span>
             </div>
             <input type="range" min={5} max={90} value={lighting.angle}
-              onChange={(e) => update("angle", parseInt(e.target.value))} />
+              onChange={(e) => update("angle", parseInt(e.target.value))} className="w-full" />
             <div className="h-1 rounded-full bg-white/5 overflow-hidden">
               <motion.div className="h-full rounded-full" animate={{ width: `${(lighting.angle / 90) * 100}%` }}
                 style={{ background: `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
@@ -968,7 +1115,6 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
           </div>
         </motion.div>
       </div>
-
       <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
         style={{ background: "linear-gradient(to bottom, transparent, #030303)" }} />
     </section>
@@ -985,7 +1131,6 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
 
-  // ── Fetch on mount ──────────────────────────────────────────────────────────
   const fetchEntries = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -1004,12 +1149,10 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
 
   useEffect(() => {
     fetchEntries();
-    // Real-time inserts from other clients
     const channel = supabase.channel("guestbook-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "guestbook" }, (payload) => {
         setEntries((prev) => {
-          const hasOpt = prev.some((e) => e.optimistic);
-          if (hasOpt) return prev.map((e) => e.optimistic ? (payload.new as GuestbookEntry) : e);
+          if (prev.some(e => e.optimistic)) return prev.map(e => e.optimistic ? (payload.new as GuestbookEntry) : e);
           return [payload.new as GuestbookEntry, ...prev];
         });
       })
@@ -1017,30 +1160,27 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
     return () => { supabase.removeChannel(channel); };
   }, [fetchEntries]);
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.content.trim()) return;
-    setSubmitting(true);
-    setError(null);
+    setSubmitting(true); setError(null);
 
     const optimistic: GuestbookEntry = {
       ...form, id: Date.now(),
       created_at: new Date().toISOString(), optimistic: true,
     };
-    setEntries((prev) => [optimistic, ...prev]);
-    const snapshot = { ...form };
+    setEntries(prev => [optimistic, ...prev]);
+    const snap = { ...form };
     setForm({ name: "", content: "", color: GUESTBOOK_COLORS[0] });
 
     try {
-      const { error: dbErr } = await supabase
-        .from("guestbook")
-        .insert({ name: snapshot.name.trim(), content: snapshot.content.trim(), color: snapshot.color });
+      const { error: dbErr } = await supabase.from("guestbook")
+        .insert({ name: snap.name.trim(), content: snap.content.trim(), color: snap.color });
       if (dbErr) throw dbErr;
-      setEntries((prev) => prev.map((e) => e.optimistic ? { ...e, optimistic: false } : e));
+      setEntries(prev => prev.map(e => e.optimistic ? { ...e, optimistic: false } : e));
     } catch (err: any) {
       setError(err?.message ?? "Failed to post. Please try again.");
-      setEntries((prev) => prev.filter((e) => !e.optimistic));
+      setEntries(prev => prev.filter(e => !e.optimistic));
     } finally {
       setSubmitting(false);
     }
@@ -1049,16 +1189,11 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
   return (
     <section ref={sectionRef as React.RefObject<HTMLElement>} id="guestbook"
       className="relative py-24 px-6 lg:px-16" style={{ background: "#030303" }}>
-      <div className="absolute top-0 left-0 right-0 h-24 pointer-events-none"
-        style={{ background: "linear-gradient(to bottom, #030303, transparent)" }} />
       <div className="max-w-6xl mx-auto">
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
           variants={fadeUp as any} custom={0} className="mb-16">
           <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">Step 03</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-white"
-            style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>
-            Guestbook
-          </h2>
+          <h2 className="text-4xl lg:text-5xl font-bold text-white">Guestbook</h2>
           <p className="text-zinc-500 mt-3 text-lg">Notes from 3D designers worldwide.</p>
         </motion.div>
 
@@ -1114,14 +1249,11 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
             className="rounded-2xl p-6 space-y-4 sticky top-24"
             style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
             <div>
-              <h3 className="font-bold text-white mb-0.5"
-                style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>Leave a note</h3>
+              <h3 className="font-bold text-white mb-0.5">Leave a note</h3>
               <p className="text-xs text-zinc-500">Your message to the world</p>
             </div>
             {error && (
-              <div className="px-3 py-2 bg-red-900/20 border border-red-500/20 rounded-lg text-xs text-red-400">
-                {error}
-              </div>
+              <div className="px-3 py-2 bg-red-900/20 border border-red-500/20 rounded-lg text-xs text-red-400">{error}</div>
             )}
             <div>
               <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block mb-1.5">Name</label>
@@ -1155,14 +1287,12 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
           </motion.form>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-        style={{ background: "linear-gradient(to bottom, transparent, #050505)" }} />
     </section>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  FEEDBACK DASHBOARD SECTION
+//  FEEDBACK DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElement | null> }) {
   const [critics, setCritics] = useState<CriticEntry[]>([]);
@@ -1189,7 +1319,7 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
     fetchCritics();
     const channel = supabase.channel("critics-rt")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "critics" }, (payload) => {
-        setCritics((prev) => [payload.new as CriticEntry, ...prev]);
+        setCritics(prev => [payload.new as CriticEntry, ...prev]);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -1217,13 +1347,9 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
           variants={fadeUp as any} custom={0} className="mb-16">
           <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">Step 04</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-white"
-            style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>
-            Feedback Dashboard
-          </h2>
+          <h2 className="text-4xl lg:text-5xl font-bold text-white">Feedback Dashboard</h2>
           <p className="text-zinc-500 mt-3 text-lg">Critic annotations from the 3D studio canvas.</p>
         </motion.div>
-
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {stats.map((s, i) => (
             <motion.div key={s.label}
@@ -1235,7 +1361,6 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
             </motion.div>
           ))}
         </div>
-
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp as any} custom={0}
           className="rounded-2xl overflow-hidden border border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
           <div className="px-6 py-4 border-b border-white/[0.05] flex items-center justify-between">
@@ -1258,23 +1383,21 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/[0.04]">
-                    {["ID", "Name", "Pos", "Category", "Comment", "Rating", "Date"].map((h) => (
+                    {["ID", "Name", "Pos", "Category", "Comment", "Rating", "Date"].map(h => (
                       <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-zinc-600 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   <AnimatePresence>
-                    {critics.map((c) => (
+                    {critics.map(c => (
                       <motion.tr key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                         className="border-b border-white/[0.02] hover:bg-white/[0.02]">
                         <td className="px-5 py-3 text-zinc-700 font-mono text-xs">#{c.id}</td>
                         <td className="px-5 py-3 text-white font-bold text-xs">{c.name || "Anon"}</td>
                         <td className="px-5 py-3 text-zinc-500 font-mono text-xs">({c.x_coord},{c.y_coord})</td>
                         <td className="px-5 py-3">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.06] text-zinc-300">
-                            {c.category}
-                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.06] text-zinc-300">{c.category}</span>
                         </td>
                         <td className="px-5 py-3 text-zinc-300 text-xs max-w-[220px] truncate">{c.comment}</td>
                         <td className="px-5 py-3 text-xs">
@@ -1301,8 +1424,8 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
 //  CRITIC POPOVER
 // ─────────────────────────────────────────────────────────────────────────────
 interface CriticPopoverProps {
-  popover: PopoverState;
-  onClose: () => void;
+  popover:  PopoverState;
+  onClose:  () => void;
   onSubmit: (data: Omit<CriticEntry, "id" | "created_at">) => Promise<void>;
 }
 function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
@@ -1315,21 +1438,10 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
     if (!form.name.trim() || !form.comment.trim()) return;
     setSubmitting(true);
     try {
-      await onSubmit({
-        name:     form.name.trim(),
-        x_coord:  popover.canvasX,
-        y_coord:  popover.canvasY,
-        category: form.category,
-        comment:  form.comment.trim(),
-        rating:   form.rating,
-      });
+      await onSubmit({ name: form.name.trim(), x_coord: popover.canvasX, y_coord: popover.canvasY, category: form.category, comment: form.comment.trim(), rating: form.rating });
       setForm({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
       onClose();
-    } catch (err: any) {
-      console.error("[CriticPopover]", err?.message ?? err);
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { } finally { setSubmitting(false); }
   };
 
   const left = typeof window !== "undefined" ? Math.min(popover.x, window.innerWidth  - 290) : popover.x;
@@ -1364,7 +1476,7 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
               className="w-full px-3 py-2 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-white/20"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              {CRITIC_CATEGORIES.map((c) => <option key={c} value={c} style={{ background: "#0a0a0a" }}>{c}</option>)}
+              {CRITIC_CATEGORIES.map(c => <option key={c} value={c} style={{ background: "#0a0a0a" }}>{c}</option>)}
             </select>
           </div>
           <div>
@@ -1377,19 +1489,16 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
           <div>
             <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider block mb-1.5">Rating</label>
             <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
+              {[1,2,3,4,5].map(star => (
                 <button key={star} type="button"
                   onClick={() => setForm({ ...form, rating: star })}
                   onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(0)}
                   className="text-2xl leading-none transition-transform hover:scale-125"
-                  style={{ color: star <= (hover || form.rating) ? "#FBBF24" : "#27272a" }}>
-                  ★
-                </button>
+                  style={{ color: star <= (hover || form.rating) ? "#FBBF24" : "#27272a" }}>★</button>
               ))}
             </div>
           </div>
-          <motion.button type="submit"
-            disabled={submitting || !form.name.trim() || !form.comment.trim()}
+          <motion.button type="submit" disabled={submitting || !form.name.trim() || !form.comment.trim()}
             className="w-full py-2.5 rounded-lg bg-white text-black text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed"
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {submitting ? "Submitting…" : "Submit Review"}
@@ -1404,13 +1513,13 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
-  const [drawerOpen,     setDrawerOpen]     = useState(false);
-  const [criticMode,     setCriticMode]     = useState(false);
-  const [activeSection,  setActiveSection]  = useState("studio");
-  const [fileUrl,        setFileUrl]        = useState<string | null>(null);
-  const [fileExt,        setFileExt]        = useState<string | null>(null);
-  const [fileName,       setFileName]       = useState<string | null>(null);
-  const [lighting,       setLighting]       = useState<LightingState>({
+  const [drawerOpen,    setDrawerOpen]    = useState(false);
+  const [criticMode,    setCriticMode]    = useState(false);
+  const [activeSection, setActiveSection] = useState("studio");
+  const [fileUrl,       setFileUrl]       = useState<string | null>(null);
+  const [fileExt,       setFileExt]       = useState<string | null>(null);
+  const [fileName,      setFileName]      = useState<string | null>(null);
+  const [lighting,      setLighting]      = useState<LightingState>({
     intensity: 70, color: "#FFFFFF", angle: 60, direction: "top",
   });
   const [popover, setPopover] = useState<PopoverState>({
@@ -1422,7 +1531,6 @@ export default function ThreeDMoodApp() {
   const guestbookRef = useRef<HTMLElement | null>(null);
   const feedbackRef  = useRef<HTMLElement | null>(null);
 
-  // Section intersection observer
   useEffect(() => {
     const refs = [
       { id: "studio",    ref: studioRef },
@@ -1431,9 +1539,9 @@ export default function ThreeDMoodApp() {
       { id: "feedback",  ref: feedbackRef },
     ];
     const observer = new IntersectionObserver(
-      (entries) => entries.forEach((entry) => {
+      entries => entries.forEach(entry => {
         if (entry.isIntersecting) {
-          const found = refs.find((r) => r.ref.current === entry.target);
+          const found = refs.find(r => r.ref.current === entry.target);
           if (found) setActiveSection(found.id);
         }
       }),
@@ -1444,11 +1552,11 @@ export default function ThreeDMoodApp() {
   }, []);
 
   const scrollToSection = (id: string) => {
-    const refMap: Record<string, React.RefObject<HTMLElement | null>> = {
+    const map: Record<string, React.RefObject<HTMLElement | null>> = {
       studio: studioRef, lighting: lightingRef,
       guestbook: guestbookRef, feedback: feedbackRef,
     };
-    refMap[id]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    map[id]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleCanvasClick = (x: number, y: number, clientX: number, clientY: number) => {
@@ -1457,20 +1565,11 @@ export default function ThreeDMoodApp() {
   };
 
   const handleCriticSubmit = async (data: Omit<CriticEntry, "id" | "created_at">) => {
-    try {
-      const { error } = await supabase.from("critics").insert({
-        name:     data.name,
-        x_coord:  data.x_coord,
-        y_coord:  data.y_coord,
-        category: data.category,
-        comment:  data.comment,
-        rating:   data.rating,
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      console.error("[Critics] insert:", err?.message ?? err);
-      throw err; // re-throw so CriticPopover can handle
-    }
+    const { error } = await supabase.from("critics").insert({
+      name: data.name, x_coord: data.x_coord, y_coord: data.y_coord,
+      category: data.category, comment: data.comment, rating: data.rating,
+    });
+    if (error) throw new Error(error.message);
   };
 
   const handleFileUpload = (file: File) => {
@@ -1490,11 +1589,7 @@ export default function ThreeDMoodApp() {
     <div className="min-h-screen bg-black overflow-x-hidden">
       {/* ── Fixed Header ── */}
       <header className="fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10"
-        style={{
-          background: "rgba(0,0,0,0.75)",
-          backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
-        }}>
+        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
         <motion.button onClick={() => scrollToSection("studio")}
           initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -1502,8 +1597,7 @@ export default function ThreeDMoodApp() {
           <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
             <span className="text-black text-xs font-black">3D</span>
           </div>
-          <span className="font-bold tracking-tight text-white text-lg"
-            style={{ fontFamily: "var(--font-space-grotesk, sans-serif)" }}>3D Mood</span>
+          <span className="font-bold tracking-tight text-white text-lg">3D Mood</span>
           <span className="hidden sm:block text-[10px] text-zinc-600 border border-zinc-800 px-2 py-0.5 rounded-full font-mono">
             for designers
           </span>
@@ -1511,19 +1605,13 @@ export default function ThreeDMoodApp() {
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
           className="hidden lg:flex items-center gap-2">
-          {["studio", "lighting", "guestbook", "feedback"].map((id) => (
+          {["studio", "lighting", "guestbook", "feedback"].map(id => (
             <button key={id} onClick={() => scrollToSection(id)}
               className="flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-300 group"
               style={{ background: activeSection === id ? "rgba(255,255,255,0.08)" : "transparent" }}>
               <span className="rounded-full transition-all duration-300 flex-shrink-0"
-                style={{
-                  width:  activeSection === id ? "6px" : "4px",
-                  height: activeSection === id ? "6px" : "4px",
-                  background: activeSection === id ? "#fff" : "rgba(255,255,255,0.2)",
-                }} />
-              <span className={`text-[10px] font-semibold transition-all duration-300 ${
-                activeSection === id ? "text-white opacity-100" : "text-zinc-600 opacity-0 group-hover:opacity-100"
-              }`}>
+                style={{ width: activeSection === id ? "6px" : "4px", height: activeSection === id ? "6px" : "4px", background: activeSection === id ? "#fff" : "rgba(255,255,255,0.2)" }} />
+              <span className={`text-[10px] font-semibold transition-all duration-300 ${activeSection === id ? "text-white opacity-100" : "text-zinc-600 opacity-0 group-hover:opacity-100"}`}>
                 {id === "studio" ? "3D Studio" : id === "lighting" ? "Mood" : id === "guestbook" ? "Guestbook" : "Feedback"}
               </span>
             </button>
@@ -1546,7 +1634,7 @@ export default function ThreeDMoodApp() {
         onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)}
       />
 
-      {/* ── Hero 3D Studio ── */}
+      {/* ── Hero Studio ── */}
       <section ref={studioRef} id="studio" className="relative" style={{ height: "100vh" }}>
         <div className="sticky top-16 w-full" style={{ height: "calc(100vh - 64px)" }}>
           <HeroCanvas
@@ -1562,19 +1650,17 @@ export default function ThreeDMoodApp() {
       <GuestbookSection sectionRef={guestbookRef} />
       <FeedbackSection  sectionRef={feedbackRef} />
 
-      {/* Critic Popover */}
       <AnimatePresence>
         {popover.visible && (
           <CriticPopover
             key="popover"
             popover={popover}
-            onClose={() => setPopover((p) => ({ ...p, visible: false }))}
+            onClose={() => setPopover(p => ({ ...p, visible: false }))}
             onSubmit={handleCriticSubmit}
           />
         )}
       </AnimatePresence>
 
-      {/* Footer */}
       <footer className="border-t border-white/[0.03] px-6 lg:px-10 py-8" style={{ background: "#050505" }}>
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-700">
           <div className="flex items-center gap-3">
