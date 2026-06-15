@@ -466,6 +466,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
         className="absolute inset-0 z-0 transition-all duration-1000"
+        onContextMenu={e => e.preventDefault()}
         style={{ filter: `brightness(${brightness})`, transform: `scale(${zoomLevel})` }}>
         {mounted && currentScene.type === "spline" && (
           <Spline
@@ -542,7 +543,33 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         <AnimatePresence>
           {panelsOpen.right && (
             <motion.div initial={{ opacity:0, x:20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
-              className="w-[220px] flex flex-col gap-3">
+              className="flex items-start gap-4">
+              
+              {/* ▽ Vertical Zoom Controller */}
+              <div className="flex flex-col items-center py-4 px-2 rounded-2xl border border-white/[0.1] bg-black/40 backdrop-blur-xl h-[340px] shadow-2xl">
+                <span className="text-[10px] font-bold text-zinc-500 mb-2">+</span>
+                <div className="relative flex-1 w-1.5 bg-white/10 rounded-full">
+                   <input type="range" min={0.5} max={2.5} step={0.05} value={zoomLevel}
+                     onChange={(e) => {
+                       const val = parseFloat(e.target.value);
+                       setZoomLevel(val);
+                       splineAppRef.current?.setZoom?.(val);
+                     }}
+                     className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
+                     style={{ writingMode: "bt-lr", WebkitAppearance: "slider-vertical" }}
+                   />
+                   <motion.div className="absolute w-4 h-4 left-1/2 -translate-x-1/2 pointer-events-none flex items-center justify-center"
+                     style={{ bottom: `${((zoomLevel - 0.5)/2)*100}%`, marginBottom:"-8px" }}>
+                     <svg viewBox="0 0 24 24" fill={isNeonMode ? "#ff007f" : "#ffffff"} className="w-full h-full drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">
+                       <path d="M12 24L0 0H24L12 24Z" />
+                     </svg>
+                   </motion.div>
+                </div>
+                <span className="text-[10px] font-bold text-zinc-500 mt-2">-</span>
+                <span className="text-[8px] font-bold text-zinc-400 mt-2 rotate-90 whitespace-nowrap uppercase tracking-widest translate-y-4">Zoom</span>
+              </div>
+
+              <div className="w-[220px] flex flex-col gap-3">
               {/* Capture Studio Button */}
               <motion.button onClick={handleCapture}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/[0.15] hover:bg-white/[0.08] transition-colors"
@@ -635,6 +662,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                 style={{ background:"rgba(8,8,8,0.65)", backdropFilter:"blur(16px)" }}>
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isLoaded?"bg-emerald-400 animate-pulse":"bg-yellow-500 animate-ping"}`} />
                 <span className="text-[9px] font-semibold text-zinc-500">{isLoaded?"Scene loaded · Spline":"Loading scene…"}</span>
+              </div>
               </div>
             </motion.div>
           )}
