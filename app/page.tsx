@@ -240,6 +240,30 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [panelsOpen, setPanelsOpen] = useState({ left: false, right: false });
   const [zoomLevel,   setZoomLevel]   = useState(1);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const handleZoomPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const track = trackRef.current;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    
+    const updateZoom = (clientY: number) => {
+      const ratio = 1 - Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+      setZoomLevel(0.5 + ratio * 2.0);
+    };
+    
+    updateZoom(e.clientY);
+
+    const onPointerMove = (ev: PointerEvent) => updateZoom(ev.clientY);
+    const onPointerUp = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+    
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
 
   const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
 
@@ -560,16 +584,14 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               {/* ▽ Vertical Zoom Controller */}
               <div className="flex flex-col items-center justify-between py-4 px-2 rounded-2xl border border-white/[0.1] bg-black/40 backdrop-blur-xl h-[340px] shadow-2xl">
                 <span className="text-[10px] font-bold text-zinc-500 mb-3">+</span>
-                <div className="relative w-4 h-[250px] flex items-center justify-center">
-                   <input type="range" min={0.5} max={2.5} step={0.01} value={zoomLevel}
-                     onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
-                     className="absolute w-[250px] h-4 opacity-0 cursor-pointer z-20"
-                     style={{ transform: "rotate(-90deg)" }}
-                   />
-                   <div className="absolute w-1.5 h-[250px] bg-white/10 rounded-full" />
-                   <motion.div className="absolute w-5 h-5 left-1/2 -translate-x-1/2 pointer-events-none flex items-center justify-center z-10"
-                     style={{ bottom: `${((zoomLevel - 0.5)/2)*100}%`, marginBottom:"-10px" }}>
-                     <svg viewBox="0 0 24 24" fill={isNeonMode ? "#ff007f" : "#ffffff"} className="w-full h-full drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+                <div 
+                  ref={trackRef}
+                  onPointerDown={handleZoomPointerDown}
+                  className="relative w-8 h-[250px] flex items-center justify-center cursor-ns-resize touch-none">
+                   <div className="absolute w-1.5 h-[250px] bg-white/10 rounded-full pointer-events-none" />
+                   <motion.div className="absolute w-6 h-6 left-1/2 -translate-x-1/2 flex items-center justify-center z-10 shadow-xl"
+                     style={{ bottom: `${((zoomLevel - 0.5)/2)*100}%`, marginBottom:"-12px" }}>
+                     <svg viewBox="0 0 24 24" fill={isNeonMode ? "#ff007f" : "#ffffff"} className="w-full h-full drop-shadow-[0_0_12px_rgba(255,255,255,1)]">
                        <path d="M12 24L0 0H24L12 24Z" />
                      </svg>
                    </motion.div>
