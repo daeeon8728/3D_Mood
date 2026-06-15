@@ -1,9 +1,9 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  3D Mood — Full-Screen Scroll Experience
+//  3D Mood — Free Mode Version
 //  Single-page scroll: Hero Canvas → Mood/Lighting → Guestbook → Feedback
-//  Supabase credentials hardcoded for direct GitHub→Vercel deployment
+//  No OAuth required. Supabase credentials hardcoded.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
@@ -11,7 +11,7 @@ import React, {
   DragEvent, ChangeEvent,
 } from "react";
 import { motion, AnimatePresence, useScroll, useTransform, type Variants } from "framer-motion";
-import { createClient, SupabaseClient, User } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 // ─── Supabase — hardcoded per spec (publishable anon key, safe for frontend) ──
 const SUPABASE_URL = "https://ychptrhmedfjzairkzwh.supabase.co";
@@ -34,7 +34,7 @@ interface GuestbookEntry {
   created_at?: string; optimistic?: boolean;
 }
 interface CriticEntry {
-  id?: number; x_coord: number; y_coord: number;
+  id?: number; name: string; x_coord: number; y_coord: number;
   category: string; comment: string; rating: number; created_at?: string;
 }
 interface PopoverState {
@@ -143,83 +143,16 @@ function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => 
   );
 }
 
-// ── OAuth Icons ───────────────────────────────────────────────────────────────
-const GoogleIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-5 h-5">
-    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-  </svg>
-);
-const KakaoIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#3C1E1E">
-    <path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.73 1.58 5.12 3.96 6.56L4.9 21l4.43-2.41C10.05 18.85 11.01 19 12 19c5.52 0 10-3.48 10-8.2S17.52 3 12 3z"/>
-  </svg>
-);
-const NaverIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="white">
-    <path d="M16.27 12.84L7.5 0H0v24h7.73V11.16L16.5 24H24V0h-7.73v12.84z"/>
-  </svg>
-);
-const AppleIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="white">
-    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.39-1.32 2.76-2.53 3.99zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-  </svg>
-);
-
-// ── OAuthButton ───────────────────────────────────────────────────────────────
-interface OAuthBtnProps {
-  provider: "google" | "kakao" | "naver" | "apple";
-  label: string; bg: string; textColor: string;
-  borderColor?: string; icon: React.ReactNode;
-  loading: boolean; onAuth: (p: "google" | "kakao" | "naver" | "apple") => void;
-}
-function OAuthButton({ provider, label, bg, textColor, borderColor, icon, loading, onAuth }: OAuthBtnProps) {
-  return (
-    <motion.button id={`auth-btn-${provider}`} onClick={() => onAuth(provider)} disabled={loading}
-      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-      style={{ background: bg, color: textColor, border: borderColor ? `1.5px solid ${borderColor}` : "none",
-               boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}
-      whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.97 }}
-      transition={{ type: "spring", stiffness: 500, damping: 30 }}>
-      <span className="w-5 h-5 flex-shrink-0">{icon}</span>
-      <span className="flex-1 text-left">{label}</span>
-      {loading && <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />}
-    </motion.button>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 //  NAVIGATION DRAWER
 // ─────────────────────────────────────────────────────────────────────────────
 interface DrawerProps {
-  isOpen: boolean; user: User | null;
+  isOpen: boolean;
   activeSection: string;
   onScrollTo: (id: string) => void;
-  onClose: () => void; onSignOut: () => void;
+  onClose: () => void;
 }
-function NavigationDrawer({ isOpen, user, activeSection, onScrollTo, onClose, onSignOut }: DrawerProps) {
-  const [authLoading, setAuthLoading] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-
-  const handleAuth = async (provider: "google" | "kakao" | "naver" | "apple") => {
-    setAuthLoading(provider);
-    setAuthError(null);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.auth as any).signInWithOAuth({
-        provider,
-        options: { redirectTo: typeof window !== "undefined" ? window.location.href : "" },
-      });
-      if (error) setAuthError((error as { message: string }).message);
-    } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : "Authentication failed");
-    } finally {
-      setAuthLoading(null);
-    }
-  };
-
+function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: DrawerProps) {
   const navItems = [
     { id: "studio", label: "3D Studio", icon: "✦", desc: "Gallery & artwork" },
     { id: "lighting", label: "Mood & Lighting", icon: "◎", desc: "Color & atmosphere" },
@@ -256,45 +189,14 @@ function NavigationDrawer({ isOpen, user, activeSection, onScrollTo, onClose, on
               </button>
             </div>
 
-            {/* Auth */}
+            {/* Info Box (Replaced Auth) */}
             <div className="px-6 py-6 border-b border-zinc-100">
-              {user ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-xl">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                      {user.email?.[0]?.toUpperCase() ?? "U"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-black truncate">
-                        {user.user_metadata?.full_name ?? user.email}
-                      </p>
-                      <p className="text-xs text-zinc-400 truncate">{user.email}</p>
-                    </div>
-                  </div>
-                  <button id="signout-btn" onClick={onSignOut}
-                    className="w-full py-2.5 rounded-xl border border-zinc-200 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors">
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="mb-4">
-                    <p className="text-xl font-bold text-black">Start in 3 seconds</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">Sign in with your preferred account</p>
-                  </div>
-                  {authError && (
-                    <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-xs text-red-600">{authError}</div>
-                  )}
-                  <OAuthButton provider="google" label="Continue with Google" bg="#FFFFFF" textColor="#3c3c3c"
-                    borderColor="#DADCE0" icon={<GoogleIcon />} loading={authLoading === "google"} onAuth={handleAuth} />
-                  <OAuthButton provider="kakao" label="Continue with Kakao" bg="#FEE500" textColor="#3C1E1E"
-                    icon={<KakaoIcon />} loading={authLoading === "kakao"} onAuth={handleAuth} />
-                  <OAuthButton provider="naver" label="Continue with Naver" bg="#03C75A" textColor="#FFFFFF"
-                    icon={<NaverIcon />} loading={authLoading === "naver"} onAuth={handleAuth} />
-                  <OAuthButton provider="apple" label="Continue with Apple" bg="#000000" textColor="#FFFFFF"
-                    icon={<AppleIcon />} loading={authLoading === "apple"} onAuth={handleAuth} />
-                </div>
-              )}
+               <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
+                 <p className="font-bold text-sm text-black mb-1">Free Mode Active</p>
+                 <p className="text-xs text-zinc-500 leading-relaxed">
+                   You can browse the gallery, control the lighting, write guestbook entries, and leave design critics without signing in.
+                 </p>
+               </div>
             </div>
 
             {/* Nav items */}
@@ -469,10 +371,10 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUploaded, fileNam
                   </motion.div>
                   <p className="text-sm font-bold ambient-text"
                     style={{ color: sColor, fontFamily: "var(--font-space-grotesk, sans-serif)" }}>
-                    Rendering 수연&apos;s
+                    Rendering 3D Artwork
                   </p>
                   <p className="text-xs mt-0.5 ambient-text" style={{ color: sColor, opacity: 0.8 }}>
-                    3D Artwork on Pedestal...
+                    on the Pedestal...
                   </p>
                   <p className="text-[11px] text-white/25 mt-2 truncate max-w-[220px] px-2">{fileName}</p>
                 </div>
@@ -631,7 +533,7 @@ function LightingSection({ lighting, onChange, sectionRef }: LightingSectionProp
           variants={fadeUp} custom={0}>
           <p className="text-xs font-bold tracking-widest uppercase text-zinc-600 mb-5">Spotlight Color</p>
           <div className="flex items-center gap-3 flex-wrap">
-            {COLOR_SWATCHES.map((c, i) => (
+            {COLOR_SWATCHES.map((c) => (
               <motion.button key={c} id={`swatch-${c.replace("#", "")}`}
                 onClick={() => update("color", c)}
                 className="relative rounded-2xl transition-all duration-200"
@@ -749,13 +651,25 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
     e.preventDefault();
     if (!form.name.trim() || !form.content.trim()) return;
     setSubmitting(true); setError(null);
+    
+    // Create optimistic entry with a dummy ID just for React map keys.
     const optimistic: GuestbookEntry = { ...form, id: Date.now(), created_at: new Date().toISOString(), optimistic: true };
     setEntries((prev) => [optimistic, ...prev]);
+    
+    // Clear form
     setForm({ name: "", content: "", color: GUESTBOOK_COLORS[0] });
+    
+    // FIX: Do NOT send the `id` field. Let Supabase/Postgres auto-generate the bigserial ID.
     const { error: dbErr } = await supabase.from("guestbook").insert({
-      name: form.name.trim(), content: form.content.trim(), color: form.color,
+      name: form.name.trim(), 
+      content: form.content.trim(), 
+      color: form.color,
     });
-    if (dbErr) { setError(dbErr.message); setEntries((prev) => prev.filter((e) => !e.optimistic)); }
+
+    if (dbErr) { 
+      setError(dbErr.message); 
+      setEntries((prev) => prev.filter((e) => !e.optimistic)); 
+    }
     setSubmitting(false);
   };
 
@@ -841,7 +755,7 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
             {error && <div className="px-3 py-2 bg-red-900/20 border border-red-500/20 rounded-lg text-xs text-red-400">{error}</div>}
             <div>
               <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider block mb-1.5">Name</label>
-              <input id="guestbook-name" type="text" value={form.name} maxLength={50} placeholder="Your name"
+              <input id="guestbook-name" type="text" value={form.name} maxLength={50} placeholder="Your nickname"
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="w-full px-3 py-2.5 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-white/20"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }} />
@@ -975,7 +889,7 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
               ↻ Refresh
             </button>
           </div>
-          {error && <div className="px-6 py-4 text-sm text-red-400 bg-red-900/10">{error} — create the <code className="text-xs">critics</code> table first.</div>}
+          {error && <div className="px-6 py-4 text-sm text-red-400 bg-red-900/10">{error} — create the <code className="text-xs">critics</code> table with the <code className="text-xs">name</code> column first.</div>}
           {loading ? (
             <div className="px-6 py-16 text-center text-zinc-700 text-sm">Loading...</div>
           ) : critics.length === 0 ? (
@@ -989,7 +903,7 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/[0.04]">
-                    {["ID", "Position", "Category", "Comment", "Rating", "Date"].map((h) => (
+                    {["ID", "Name", "Position", "Category", "Comment", "Rating", "Date"].map((h) => (
                       <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-zinc-600 uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -1002,6 +916,7 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
                         transition={{ delay: Math.min(i * 0.04, 0.4) }}
                         className="border-b border-white/[0.02] hover:bg-white/[0.02] transition-colors">
                         <td className="px-5 py-3 text-zinc-700 font-mono text-xs">#{c.id}</td>
+                        <td className="px-5 py-3 text-white font-bold text-xs">{c.name || "Anonymous"}</td>
                         <td className="px-5 py-3 text-zinc-500 font-mono text-xs whitespace-nowrap">({c.x_coord}%, {c.y_coord}%)</td>
                         <td className="px-5 py-3">
                           <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/[0.06] text-zinc-300">{c.category}</span>
@@ -1035,16 +950,23 @@ interface CriticPopoverProps {
   onSubmit: (data: Omit<CriticEntry, "id" | "created_at">) => Promise<void>;
 }
 function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
-  const [form, setForm] = useState({ category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
+  const [form, setForm] = useState({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
   const [submitting, setSubmitting] = useState(false);
   const [hover, setHover] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.comment.trim()) return;
+    if (!form.name.trim() || !form.comment.trim()) return;
     setSubmitting(true);
-    await onSubmit({ x_coord: popover.canvasX, y_coord: popover.canvasY, ...form });
-    setForm({ category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
+    await onSubmit({ 
+      name: form.name.trim(),
+      x_coord: popover.canvasX, 
+      y_coord: popover.canvasY, 
+      category: form.category,
+      comment: form.comment.trim(),
+      rating: form.rating
+    });
+    setForm({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
     setSubmitting(false);
     onClose();
   };
@@ -1069,6 +991,15 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
           </div>
         </div>
         <div className="p-4 space-y-3">
+          {/* New Nickname Field */}
+          <div>
+            <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider block mb-1.5">Nickname</label>
+            <input id="critic-name" type="text" value={form.name} maxLength={30}
+              placeholder="Your name"
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg text-xs text-white placeholder-zinc-700 focus:outline-none focus:ring-1 focus:ring-white/20"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }} />
+          </div>
           <div>
             <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider block mb-1.5">Category</label>
             <select id="critic-category" value={form.category}
@@ -1099,7 +1030,7 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
             </div>
           </div>
           <motion.button id="submit-review-btn" type="submit"
-            disabled={submitting || !form.comment.trim()}
+            disabled={submitting || !form.name.trim() || !form.comment.trim()}
             className="w-full py-2.5 rounded-lg bg-white text-black text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed"
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {submitting ? (
@@ -1120,7 +1051,6 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
 export default function ThreeDMoodApp() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [criticMode, setCriticMode] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
   const [activeSection, setActiveSection] = useState("studio");
   const [fileUploaded, setFileUploaded] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -1132,15 +1062,6 @@ export default function ThreeDMoodApp() {
   const lightingRef = useRef<HTMLElement | null>(null);
   const guestbookRef = useRef<HTMLElement | null>(null);
   const feedbackRef = useRef<HTMLElement | null>(null);
-
-  // Auth listener
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
 
   // IntersectionObserver — track active section
   useEffect(() => {
@@ -1173,18 +1094,13 @@ export default function ThreeDMoodApp() {
     refMap[id]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setDrawerOpen(false);
-  };
-
   const handleCanvasClick = (x: number, y: number, clientX: number, clientY: number) => {
     if (!criticMode) return;
     setPopover({ visible: true, x: clientX + 12, y: clientY - 20, canvasX: x, canvasY: y });
   };
 
   const handleCriticSubmit = async (data: Omit<CriticEntry, "id" | "created_at">) => {
+    // FIX: Do not pass `id` here. Supabase will autogenerate the bigserial ID.
     const { error } = await supabase.from("critics").insert(data);
     if (error) console.error("Critic insert:", error.message);
   };
@@ -1252,11 +1168,10 @@ export default function ThreeDMoodApp() {
 
       {/* ── NAVIGATION DRAWER ── */}
       <NavigationDrawer
-        isOpen={drawerOpen} user={user}
+        isOpen={drawerOpen}
         activeSection={activeSection}
         onScrollTo={scrollToSection}
-        onClose={() => setDrawerOpen(false)}
-        onSignOut={handleSignOut} />
+        onClose={() => setDrawerOpen(false)} />
 
       {/* ── SECTION 1: HERO CANVAS ── */}
       <section ref={studioRef} id="studio" className="relative" style={{ height: "100vh" }}>
@@ -1297,7 +1212,7 @@ export default function ThreeDMoodApp() {
             <div className="w-6 h-6 rounded bg-white flex items-center justify-center">
               <span className="text-black text-[9px] font-black">3D</span>
             </div>
-            <span>© 2026 3D Mood · All rights reserved</span>
+            <span>© 2026 3D Mood · Free Mode</span>
           </div>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
