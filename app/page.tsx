@@ -547,11 +547,14 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
       {/* ── Right panel: mood presets + controls ── */}
       <div className={`absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-        {/* Studio Controls Toggle (Visual Indicator) */}
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/20 bg-black/60 backdrop-blur-xl shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+        {/* Studio Controls Toggle */}
+        <motion.button 
+          onClick={() => setPanelsOpen(p => ({...p, right: !p.right}))}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${panelsOpen.right ? 'border-white/40 bg-white/10' : 'border-white/20 bg-black/60'} backdrop-blur-xl shadow-[0_0_15px_rgba(255,255,255,0.05)]`}
+          whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
           <span>🎬</span>
           <span className="text-[10px] font-bold uppercase tracking-widest text-white">3D Render Studio</span>
-        </div>
+        </motion.button>
 
         {/* Presentation Toggle */}
         <motion.button onClick={onTogglePresentation}
