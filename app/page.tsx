@@ -473,10 +473,9 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
 
   return (
-    <div className={`relative w-full h-full overflow-hidden transition-colors duration-1000 ${isNeonMode ? 'bg-[#050505]' : 'bg-[#030303]'}`}>
-      {/* ── Neon Background Glow ── */}
-      <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isNeonMode ? 'opacity-40 blur-3xl' : 'opacity-0'}`}
-           style={{ background: 'radial-gradient(circle at 50% 50%, rgba(255, 0, 127, 0.8) 0%, rgba(138, 43, 226, 0.5) 50%, transparent 80%)' }} />
+    <div className="relative w-full h-full overflow-hidden transition-colors duration-1000 bg-[#030303]">
+      {/* ── Background ── */}
+      <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 opacity-0" />
 
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
@@ -484,20 +483,20 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* ── Lighting Simulation Overlay ── */}
       <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
         style={{ 
-          background: isNeonMode ? "radial-gradient(circle at 50% 50%, rgba(255,0,127,0.3) 0%, rgba(138,43,226,0.1) 100%)" : `${overlayHex}${overlayAlpha}`, 
+          background: `${overlayHex}${overlayAlpha}`, 
           filter: `brightness(${brightness})`, 
-          mixBlendMode: isNeonMode ? "color-dodge" : "screen" 
+          mixBlendMode: "screen" 
         }} />
 
       {/* ── Edge glow wings ── */}
       <div className="absolute inset-0 pointer-events-none z-[11] transition-all duration-700" style={{
-        background: isNeonMode ? "none" : `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
+        background: `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
       }} />
       <div className="absolute top-0 left-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: isNeonMode ? "none" : `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+        background: `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
       }} />
       <div className="absolute top-0 right-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: isNeonMode ? "none" : `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+        background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
       }} />
 
       {/* ── Spline viewer ── */}
@@ -610,11 +609,9 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               </motion.button>
 
               {/* Mood presets */}
-              <div className={`rounded-2xl overflow-hidden border transition-all duration-500 ${isNeonMode ? 'border-pink-500/50' : 'border-white/[0.07]'}`}
-                style={{ 
-                  background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)",
-                  boxShadow: isNeonMode ? "0 0 25px rgba(255, 0, 127, 0.9), inset 0 0 15px rgba(255, 0, 127, 0.3)" : "none"
-                }}>
+              {/* Mood presets */}
+              <div className="rounded-2xl overflow-hidden border transition-all duration-500 border-white/[0.07]"
+                style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
                 <div className="px-4 pt-4 pb-2">
                   <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -661,12 +658,11 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                   </div>
                   <input type="range" min={10} max={100} value={lighting.intensity}
                     onChange={(e) => onLightingChange({ ...lighting, intensity:parseInt(e.target.value) })}
-                    className={`w-full h-1 cursor-pointer transition-colors duration-500 ${isNeonMode ? 'accent-pink-500' : 'accent-white'}`}
-                    style={{ textShadow: isNeonMode ? "0 0 10px #ff007f" : "none" }} />
-                  <div className={`h-1 rounded-full mt-2 overflow-hidden transition-all duration-500 ${isNeonMode ? 'bg-pink-900/30 shadow-[0_0_10px_rgba(255,0,127,0.4)]' : 'bg-white/[0.04]'}`}>
+                    className="w-full h-1 cursor-pointer transition-colors duration-500 accent-white" />
+                  <div className="h-1 rounded-full mt-2 overflow-hidden transition-all duration-500 bg-white/[0.04]">
                     <motion.div className="h-full rounded-full"
                       animate={{ width:`${((lighting.intensity-10)/90)*100}%` }}
-                      style={{ background: isNeonMode ? `linear-gradient(90deg, rgba(255,0,127,0.5), rgba(255,0,127,1))` : `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
+                      style={{ background: `linear-gradient(90deg, ${lighting.color}40, ${lighting.color})` }} />
                   </div>
                 </div>
 
@@ -744,11 +740,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       <AnimatePresence>
         {presentationMode && (
           <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:30 }} transition={{ duration:0.6, ease:[0.22,1,0.36,1] }}
-            className={`absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border shadow-2xl transition-all duration-500 ${isNeonMode ? 'border-pink-500/80' : 'border-white/[0.15]'}`}
-            style={{ 
-              background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)",
-              boxShadow: isNeonMode ? "0 0 20px rgba(255, 0, 127, 0.6), inset 0 0 10px rgba(255, 0, 127, 0.3)" : undefined
-            }}>
+            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border border-white/[0.15] shadow-2xl transition-all duration-500"
+            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
             <button onClick={() => { setZoomLevel(1); onLightingChange({...lighting, autoRotate:false}); }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
               Front View
