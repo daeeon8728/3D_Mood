@@ -53,9 +53,9 @@ interface PopoverState {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SCENES: SceneConfig[] = [
-  { id: "molang",   name: "Test 1", type: "spline", url: "https://prod.spline.design/dCRqPKHivD1pvJqRV2EgK7xd/scene.splinecode" },
-  { id: "tubes",    name: "Test 2", type: "spline", url: "https://prod.spline.design/ysfwoAx5lQUC1YBJHbAJtllX/scene.splinecode" },
-  { id: "concrete", name: "Test 3", type: "spline", url: "https://prod.spline.design/ay59aodnex3hFiqc9i5tAJCX/scene.splinecode" },
+  { id: "molang",   name: "Test 1", type: "spline", url: "https://prod.spline.design/6Wq1Q7YAnsnasGyT/scene.splinecode" },
+  { id: "tubes",    name: "Test 2", type: "spline", url: "https://prod.spline.design/6Wq1Q7YAnsnasGyT/scene.splinecode" },
+  { id: "concrete", name: "Test 3", type: "spline", url: "https://prod.spline.design/6Wq1Q7YAnsnasGyT/scene.splinecode" },
 ];
 
 const MOOD_PRESETS: MoodPreset[] = [
