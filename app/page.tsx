@@ -460,14 +460,18 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   let containerFilter = `brightness(${brightness})`;
   let containerOpacity = 1;
   let containerBackdrop = "none";
+  let containerBackground = "transparent";
+  let containerBorder = "none";
+
   if (isStudioMode) {
     if (materialMode === "Glass") {
-      containerBackdrop = "blur(5px) saturate(180%)";
-      containerOpacity = 0.8;
+      containerBackdrop = "blur(15px) saturate(200%)";
+      containerBackground = "rgba(255, 255, 255, 0.2)";
+      containerBorder = "1px solid rgba(255, 255, 255, 0.3)";
     } else if (materialMode === "Matte") {
-      containerFilter = `brightness(${brightness}) contrast(0.9)`;
+      containerFilter = "grayscale(30%) contrast(0.7) brightness(1.1)";
     } else if (materialMode === "Chrome") {
-      containerFilter = `brightness(${brightness}) contrast(1.4) hue-rotate(10deg)`;
+      containerFilter = "contrast(1.8) brightness(1.5) saturate(150%) hue-rotate(5deg)";
     }
   }
 
@@ -524,6 +528,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
           WebkitFilter: containerFilter, filter: containerFilter, 
           WebkitBackdropFilter: containerBackdrop, backdropFilter: containerBackdrop,
           opacity: containerOpacity,
+          background: containerBackground,
+          border: containerBorder,
           transform: `scale(${zoomLevel})`, 
           transition: "all 0.5s ease-out" 
         }}>
