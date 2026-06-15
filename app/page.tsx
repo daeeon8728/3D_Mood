@@ -9,7 +9,7 @@
 import React, {
   useState, useEffect, useRef, useCallback,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 
@@ -240,29 +240,14 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [panelsOpen, setPanelsOpen] = useState({ left: false, right: false });
   const [zoomLevel,   setZoomLevel]   = useState(1);
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  const handleZoomPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    const track = trackRef.current;
-    if (!track) return;
-    const rect = track.getBoundingClientRect();
-    
-    const updateZoom = (clientY: number) => {
-      const ratio = 1 - Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-      setZoomLevel(0.5 + ratio * 2.0);
-    };
-    
-    updateZoom(e.clientY);
-
-    const onPointerMove = (ev: PointerEvent) => updateZoom(ev.clientY);
-    const onPointerUp = () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    };
-    
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
+  
+  // ── Framer Motion Drag Zoom ────────────────────────────────────────────────
+  const dragY = useMotionValue((1 - ((1 - 0.5) / 2)) * 230); 
+  
+  const handleDrag = () => {
+    const y = dragY.get();
+    const ratio = 1 - Math.max(0, Math.min(1, y / 230));
+    setZoomLevel(0.5 + ratio * 2.0);
   };
 
   const currentScene = SCENES.find(s => s.id === currentSceneId) || SCENES[0];
@@ -584,16 +569,20 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               {/* ▽ Vertical Zoom Controller */}
               <div className="flex flex-col items-center justify-between py-4 px-2 rounded-2xl border border-white/[0.1] bg-black/40 backdrop-blur-xl h-[340px] shadow-2xl">
                 <span className="text-[10px] font-bold text-zinc-500 mb-3">+</span>
-                <div 
-                  ref={trackRef}
-                  onPointerDown={handleZoomPointerDown}
-                  className="relative w-8 h-[250px] flex items-center justify-center cursor-ns-resize touch-none">
-                   <div className="absolute w-1.5 h-[250px] bg-white/10 rounded-full pointer-events-none" />
-                   <motion.div className="absolute w-6 h-6 left-1/2 -translate-x-1/2 flex items-center justify-center z-10 shadow-xl"
-                     style={{ bottom: `${((zoomLevel - 0.5)/2)*100}%`, marginBottom:"-12px" }}>
-                     <svg viewBox="0 0 24 24" fill={isNeonMode ? "#ff007f" : "#ffffff"} className="w-full h-full drop-shadow-[0_0_12px_rgba(255,255,255,1)]">
-                       <path d="M12 24L0 0H24L12 24Z" />
-                     </svg>
+                <div className="relative w-8 h-[250px] flex justify-center">
+                   <div className="absolute top-0 bottom-0 w-1.5 bg-white/10 rounded-full" />
+                   
+                   <motion.div
+                     drag="y"
+                     dragConstraints={{ top: 0, bottom: 230 }}
+                     dragElastic={0}
+                     dragMomentum={false}
+                     style={{ y: dragY }}
+                     onDrag={handleDrag}
+                     className="absolute top-0 flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing z-20 touch-none"
+                   >
+                     {/* Pure CSS Inverted Triangle (▽) */}
+                     <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[10px] ${isNeonMode ? 'border-t-[#ff007f] drop-shadow-[0_0_10px_rgba(255,0,127,1)]' : 'border-t-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]'}`} />
                    </motion.div>
                 </div>
                 <span className="text-[10px] font-bold text-zinc-500 mt-3">-</span>
