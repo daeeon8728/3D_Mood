@@ -310,25 +310,42 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   useEffect(() => {
     const app = splineAppRef.current;
     if (!app) return;
-    try {
-      app.setVariable?.("MaterialMode", materialMode);
-      
-      app.setVariable?.("KeyLightIntensity", studioLights.key.intensity);
-      app.setVariable?.("KeyLightColor", studioLights.key.color);
-      app.setVariable?.("FillLightIntensity", studioLights.fill.intensity);
-      app.setVariable?.("FillLightColor", studioLights.fill.color);
-      app.setVariable?.("RimLightIntensity", studioLights.rim.intensity);
-      app.setVariable?.("RimLightColor", studioLights.rim.color);
+    const setVar = (name: string, val: any) => {
+      try { app.setVariable?.(name, val); } catch (e) {}
+    };
 
-      if (app.findObjectByName) {
-        const keyL = app.findObjectByName("Key Light");
-        if (keyL) { keyL.intensity = studioLights.key.intensity; if (keyL.color?.set) keyL.color.set(studioLights.key.color); }
+    setVar("MaterialMode", materialMode);
+    
+    setVar("KeyLightIntensity", studioLights.key.intensity);
+    setVar("KeyLightColor", studioLights.key.color);
+    setVar("FillLightIntensity", studioLights.fill.intensity);
+    setVar("FillLightColor", studioLights.fill.color);
+    setVar("RimLightIntensity", studioLights.rim.intensity);
+    setVar("RimLightColor", studioLights.rim.color);
+
+    try {
+      if (app.getObjects) {
+        const objects = app.getObjects();
         
-        const fillL = app.findObjectByName("Fill Light");
-        if (fillL) { fillL.intensity = studioLights.fill.intensity; if (fillL.color?.set) fillL.color.set(studioLights.fill.color); }
-        
-        const rimL = app.findObjectByName("Rim Light");
-        if (rimL) { rimL.intensity = studioLights.rim.intensity; if (rimL.color?.set) rimL.color.set(studioLights.rim.color); }
+        const keyL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'keylight');
+        const fillL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'filllight');
+        const rimL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'rimlight');
+
+        if (keyL) { 
+          keyL.intensity = studioLights.key.intensity; 
+          if (keyL.color && typeof keyL.color.set === 'function') keyL.color.set(studioLights.key.color); 
+          else keyL.color = studioLights.key.color;
+        }
+        if (fillL) { 
+          fillL.intensity = studioLights.fill.intensity; 
+          if (fillL.color && typeof fillL.color.set === 'function') fillL.color.set(studioLights.fill.color); 
+          else fillL.color = studioLights.fill.color;
+        }
+        if (rimL) { 
+          rimL.intensity = studioLights.rim.intensity; 
+          if (rimL.color && typeof rimL.color.set === 'function') rimL.color.set(studioLights.rim.color); 
+          else rimL.color = studioLights.rim.color;
+        }
       }
     } catch (_) {}
   }, [studioLights, materialMode, isLoaded]);
