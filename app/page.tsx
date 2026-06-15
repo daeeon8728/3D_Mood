@@ -11,7 +11,11 @@ import React, {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import Spline from "@splinetool/react-spline";
+import dynamic from "next/dynamic";
+
+const Spline = dynamic(() => import("@splinetool/react-spline"), { 
+  ssr: false, 
+});
 
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL      = "https://ychptrhmedfjzairkzwh.supabase.co";
