@@ -16,7 +16,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 // ─── 3D ENGINE IMPORTS ────────────────────────────────────────────────────────
 import * as THREE from "three";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
-import { Bounds, useGLTF, OrbitControls, ContactShadows, Environment } from "@react-three/drei";
+import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
 import { OBJLoader } from "three-stdlib";
 
 // ─── Supabase — hardcoded per spec (publishable anon key, safe for frontend) ──
@@ -239,27 +239,141 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
 //  3D WEBGL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Helper to smooth camera zoom
-function CameraRig({ zoomLevel }: { zoomLevel: number }) {
+// Smooth camera distance control (zoom by moving camera closer/further)
+function CameraRig({ distance }: { distance: number }) {
   const { camera } = useThree();
   useFrame(() => {
-    // Interpolate zoom smoothly
-    camera.zoom = THREE.MathUtils.lerp(camera.zoom, zoomLevel, 0.1);
-    camera.updateProjectionMatrix();
+    // Keep camera direction but interpolate distance from origin
+    const dir = camera.position.clone().normalize();
+    const target = dir.multiplyScalar(distance);
+    camera.position.lerp(target, 0.08);
   });
   return null;
 }
 
-// Actual 3D Mesh Loader
+// GLTF Loader with auto-centering
+function GLTFModel({ url }: { url: string }) {
+  const { scene } = useGLTF(url);
+  
+  // Auto-center and scale the model to fit a 2-unit bounding box
+  useEffect(() => {
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    
+    // Center the model at origin
+    scene.position.sub(center);
+    
+    // Scale so largest dimension = 2 units
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) scene.scale.setScalar(2 / maxDim);
+    
+    // Ensure it sits on the ground plane (y=0)
+    const newBox = new THREE.Box3().setFromObject(scene);
+    scene.position.y -= newBox.min.y;
+  }, [scene]);
+  
+  return <primitive object={scene} castShadow receiveShadow />;
+}
+
+// OBJ Loader with auto-centering
+function OBJModel({ url }: { url: string }) {
+  const obj = useLoader(OBJLoader, url);
+  
+  useEffect(() => {
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    
+    obj.position.sub(center);
+    
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) obj.scale.setScalar(2 / maxDim);
+    
+    const newBox = new THREE.Box3().setFromObject(obj);
+    obj.position.y -= newBox.min.y;
+  }, [obj]);
+  
+  // Apply a nice PBR default material to OBJ files (which have no materials by default)
+  useEffect(() => {
+    obj.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+          color: 0xcccccc,
+          roughness: 0.4,
+          metalness: 0.1,
+        });
+        (child as THREE.Mesh).castShadow = true;
+        (child as THREE.Mesh).receiveShadow = true;
+      }
+    });
+  }, [obj]);
+  
+  return <primitive object={obj} />;
+}
+
+// Wrapper that picks the right loader
 function ModelLoader({ url, ext }: { url: string; ext: string }) {
   if (ext === "obj") {
-    const obj = useLoader(OBJLoader, url);
-    return <primitive object={obj} />;
-  } else {
-    // glTF or glb
-    const { scene } = useGLTF(url);
-    return <primitive object={scene} />;
+    return <OBJModel url={url} />;
   }
+  return <GLTFModel url={url} />;
+}
+
+// Directional Mood Light that points at the world origin from correct direction
+function MoodLight({ lighting }: { lighting: LightingState }) {
+  const { intensity, color, angle, direction } = lighting;
+  const lightRef = useRef<THREE.SpotLight>(null!);
+  const targetRef = useRef<THREE.Object3D>(null!);
+  
+  const d = 8;
+  const pos: [number, number, number] =
+    direction === "top"   ? [0,  d,  0.001] :
+    direction === "front" ? [0,  d * 0.5,  d] :
+    direction === "back"  ? [0,  d * 0.5, -d] :
+    direction === "left"  ? [-d, d * 0.5,  0] :
+                            [d,  d * 0.5,  0];
+  
+  useEffect(() => {
+    if (lightRef.current && targetRef.current) {
+      lightRef.current.target = targetRef.current;
+    }
+  }, []);
+  
+  return (
+    <>
+      {/* Subtle warm fill from opposite side */}
+      <hemisphereLight color="#ffffff" groundColor="#221133" intensity={0.4} />
+      
+      {/* Main mood spotlight */}
+      <spotLight
+        ref={lightRef}
+        position={pos}
+        angle={(Math.min(angle, 75) * Math.PI) / 180}
+        penumbra={0.6}
+        color={color}
+        intensity={(intensity / 100) * 120}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0001}
+        decay={1.5}
+        distance={d * 4}
+      />
+      {/* Target sits at model center */}
+      <object3D ref={targetRef} position={[0, 1, 0]} />
+      
+      {/* Secondary fill light from opposite direction to prevent total darkness */}
+      <directionalLight
+        position={[-pos[0] * 0.4, pos[1] * 0.4, -pos[2] * 0.4]}
+        intensity={(intensity / 100) * 8}
+        color={color}
+      />
+    </>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,9 +393,8 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Custom UI Controls for 3D Viewer
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [rotationY, setRotationY] = useState(0);
+  // Zoom = camera distance. Default 5 units, range 1.5 (close) to 10 (far)
+  const [camDistance, setCamDistance] = useState(5);
   const isDraggingZoom = useRef(false);
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -305,24 +418,14 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
   const handleZoomDrag = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDraggingZoom.current) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    // 0 (top) to 1 (bottom)
     const relativeY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    // Invert: top (0) = max zoom (3), bottom (1) = min zoom (0.5)
-    const newZoom = 0.5 + (1 - relativeY) * 2.5; 
-    setZoomLevel(newZoom);
+    // Top = closest (1.5), Bottom = furthest (10)
+    const newDist = 1.5 + relativeY * 8.5;
+    setCamDistance(newDist);
   };
 
-  const { color: sColor, intensity, angle, direction } = lighting;
+  const { color: sColor, intensity, angle } = lighting;
   const sOpacity = intensity / 100;
-  
-  // Calculate light position based on direction
-  const d = 15; // Distance of light
-  const lightPosition: [number, number, number] = 
-    direction === "top" ? [0, d, 0] :
-    direction === "front" ? [0, d/2, d] :
-    direction === "back" ? [0, d/2, -d] :
-    direction === "left" ? [-d, d/2, 0] :
-    [d, d/2, 0];
 
   return (
     <div ref={canvasRef} onClick={handleClick}
@@ -340,39 +443,36 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
       {/* ── WebGL 3D Canvas ── */}
       <div className="absolute inset-0 z-10">
         {fileUrl ? (
-          <Canvas orthographic={false} camera={{ position: [0, 2, 8], fov: 45 }}>
-            <CameraRig zoomLevel={zoomLevel} />
+          <Canvas
+            shadows
+            camera={{ position: [0, 2, 5], fov: 40 }}
+            gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
+          >
+            {/* Smooth zoom via camera distance */}
+            <CameraRig distance={camDistance} />
             
-            {/* Environmental ambient light so shadows aren't pitch black */}
-            <ambientLight intensity={0.2} color="#ffffff" />
+            {/* HDR Environment — makes PBR materials look realistic */}
+            <Environment preset="studio" environmentIntensity={0.6} />
             
-            {/* The primary Mood Spotlight */}
-            <spotLight
-              position={lightPosition}
-              angle={(angle * Math.PI) / 180}
-              penumbra={0.4}
-              color={sColor}
-              intensity={sOpacity * 5} // Three.js intensities often need scaling
-              castShadow
-            />
+            {/* All directional mood lighting */}
+            <MoodLight lighting={lighting} />
             
             <Suspense fallback={null}>
-              {/* Rotate the model based on UI buttons */}
-              <group rotation={[0, rotationY, 0]}>
-                {/* Bounds automatically fits the model to the screen perfectly */}
-                <Bounds fit clip margin={1.2}>
-                  <ModelLoader url={fileUrl} ext={fileExt!} />
-                </Bounds>
-              </group>
+              <ModelLoader url={fileUrl} ext={fileExt!} />
               
-              {/* Floor shadow receiver */}
-              <ContactShadows position={[0, -0.5, 0]} opacity={0.5} scale={10} blur={2} far={4} color={sColor} />
+              {/* Soft ground shadow */}
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+                <planeGeometry args={[20, 20]} />
+                <shadowMaterial opacity={0.25} color={sColor} />
+              </mesh>
             </Suspense>
 
-            {/* Optional orbit controls fallback for mouse drag rotation */}
-            <OrbitControls 
-              enableZoom={false} // Disabled default zoom to respect our custom UI slider
+            {/* Full orbit: drag to rotate, scroll blocked (we use custom slider) */}
+            <OrbitControls
+              enableZoom={false}
               enablePan={false}
+              minPolarAngle={0.1}
+              maxPolarAngle={Math.PI / 2}
               makeDefault
             />
           </Canvas>
@@ -458,49 +558,39 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
               <p className="text-sm font-mono text-white truncate max-w-[200px]">{fileName}</p>
             </div>
 
+            {/* Interaction hint */}
+            <div className="absolute bottom-20 left-6 px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded-full border border-white/[0.06] pointer-events-none">
+              <p className="text-[10px] text-zinc-500 font-medium">Drag to rotate · Scroll below to adjust lighting</p>
+            </div>
+
             {/* Custom Reverse Triangle Zoom Slider (Right side) */}
-            <div className="absolute top-1/2 -translate-y-1/2 right-6 h-64 w-12 flex flex-col items-center pointer-events-auto">
-              <span className="text-[10px] font-bold text-zinc-500 mb-2">ZOOM</span>
+            <div className="absolute top-1/2 -translate-y-1/2 right-6 h-64 w-12 flex flex-col items-center pointer-events-auto select-none">
+              <span className="text-[10px] font-bold text-zinc-500 mb-2 tracking-widest">IN</span>
               
               {/* Slider Track */}
-              <div 
+              <div
                 className="relative w-full flex-1 flex justify-center cursor-ns-resize group"
-                onMouseDown={(e) => { isDraggingZoom.current = true; handleZoomDrag(e); }}
+                onMouseDown={(e) => { e.preventDefault(); isDraggingZoom.current = true; handleZoomDrag(e); }}
                 onMouseMove={handleZoomDrag}
                 onMouseUp={() => isDraggingZoom.current = false}
                 onMouseLeave={() => isDraggingZoom.current = false}
               >
-                {/* SVG Visual Track - Reverse Triangle (wide at top, narrow at bottom) */}
-                <svg width="24" height="100%" preserveAspectRatio="none" className="absolute inset-0 m-auto text-white/10 group-hover:text-white/20 transition-colors">
-                  <polygon points="0,0 24,0 12,100%" fill="currentColor" />
+                {/* SVG Triangle: wide top = zoom in (close), narrow bottom = zoom out (far) */}
+                <svg viewBox="0 0 24 200" preserveAspectRatio="none"
+                  className="absolute inset-0 w-6 h-full m-auto transition-colors duration-200"
+                  style={{ opacity: isDraggingZoom.current ? 0.4 : 0.15 }}>
+                  <polygon points="0,0 24,0 12,200" fill="white" />
                 </svg>
                 
-                {/* Thumb Indicator */}
-                <motion.div 
-                  className="absolute left-1/2 w-8 h-2 -ml-4 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none"
-                  // relativeY = 1 - (zoomLevel - 0.5) / 2.5
-                  animate={{ top: `${(1 - (zoomLevel - 0.5) / 2.5) * 100}%`, translateY: "-50%" }}
-                  transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                {/* Thumb — position maps distance: 1.5 (top=0%) → 10 (bottom=100%) */}
+                <motion.div
+                  className="absolute left-1/2 -translate-x-1/2 w-8 h-2 bg-white rounded-full shadow-[0_0_12px_rgba(255,255,255,0.6)] pointer-events-none"
+                  animate={{ top: `${((camDistance - 1.5) / 8.5) * 100}%`, translateY: "-50%" }}
+                  transition={{ type: "spring", stiffness: 600, damping: 45 }}
                 />
               </div>
               
-              <span className="text-[10px] font-bold text-zinc-500 mt-2">OUT</span>
-            </div>
-
-            {/* Left/Right Rotate Buttons (Bottom Right) */}
-            <div className="absolute bottom-10 right-6 flex items-center gap-2 pointer-events-auto">
-              <div className="flex flex-col mr-2 text-right">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Rotate</span>
-                <span className="text-[9px] font-mono text-zinc-600">Model Space</span>
-              </div>
-              <button onClick={() => setRotationY(r => r - Math.PI / 4)} 
-                className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white text-lg transition-colors backdrop-blur-md">
-                ←
-              </button>
-              <button onClick={() => setRotationY(r => r + Math.PI / 4)}
-                className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white text-lg transition-colors backdrop-blur-md">
-                →
-              </button>
+              <span className="text-[10px] font-bold text-zinc-500 mt-2 tracking-widest">OUT</span>
             </div>
           </motion.div>
         )}
