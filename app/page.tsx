@@ -314,15 +314,51 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       ctx.fillStyle = "#030303";
       ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
 
-      // 2. Draw the 3D model
+      // 2. Draw the 3D model WITH Brightness Filter!
+      const brightnessValue = 0.4 + (lighting.intensity / 100) * 1.0;
+      ctx.filter = `brightness(${brightnessValue})`;
       ctx.drawImage(webglCanvas, 0, 0);
+      ctx.filter = "none";
 
-      // 3. Draw the CSS overlay mood lighting
+      // 3. Draw the CSS overlay mood lighting (Screen blend mode)
       const overlayAlpha = (lighting.intensity / 100) * 0.18;
       if (overlayAlpha > 0) {
         ctx.globalCompositeOperation = "screen";
         ctx.fillStyle = lighting.color;
         ctx.globalAlpha = overlayAlpha;
+        ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+      }
+
+      // 4. Draw Edge Glows to match CSS exactly
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1.0;
+      const glowAlpha = (lighting.intensity / 100) * 0.7;
+      if (glowAlpha > 0) {
+        const hex = lighting.color.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16) || 255;
+        const g = parseInt(hex.substring(2, 4), 16) || 255;
+        const b = parseInt(hex.substring(4, 6), 16) || 255;
+
+        // Top Center Glow
+        const gradTop = ctx.createRadialGradient(canvas2d.width / 2, 0, 0, canvas2d.width / 2, 0, canvas2d.width * 0.7);
+        gradTop.addColorStop(0, `rgba(${r},${g},${b},${glowAlpha})`);
+        gradTop.addColorStop(0.35, `rgba(${r},${g},${b},0.13)`);
+        gradTop.addColorStop(0.68, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = gradTop;
+        ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+        
+        // Left Edge Glow
+        const gradLeft = ctx.createRadialGradient(0, canvas2d.height * 0.45, 0, 0, canvas2d.height * 0.45, canvas2d.width * 0.45);
+        gradLeft.addColorStop(0, `rgba(${r},${g},${b},${glowAlpha * 0.45})`);
+        gradLeft.addColorStop(0.7, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = gradLeft;
+        ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+
+        // Right Edge Glow
+        const gradRight = ctx.createRadialGradient(canvas2d.width, canvas2d.height * 0.45, 0, canvas2d.width, canvas2d.height * 0.45, canvas2d.width * 0.45);
+        gradRight.addColorStop(0, `rgba(${r},${g},${b},${glowAlpha * 0.45})`);
+        gradRight.addColorStop(0.7, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = gradRight;
         ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
       }
 
