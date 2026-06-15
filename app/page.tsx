@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
-  useState, useEffect, useRef, useCallback,
+  useState, useEffect, useRef, useCallback, useMemo,
   DragEvent, ChangeEvent, Suspense,
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,7 +16,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 // ─── 3D ENGINE IMPORTS ────────────────────────────────────────────────────────
 import * as THREE from "three";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
-import { useGLTF, OrbitControls, Environment, SoftShadows, ContactShadows, Center } from "@react-three/drei";
+import { useGLTF, OrbitControls, Environment, SoftShadows, ContactShadows } from "@react-three/drei";
 import { OBJLoader } from "three-stdlib";
 
 // ─── Supabase — hardcoded per spec (publishable anon key, safe for frontend) ──
@@ -239,64 +239,108 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
 //  3D WEBGL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Helper: normalize any Object3D so its bbox center = world origin, max dim = 2
-function normalizeObject(obj: THREE.Object3D) {
-  const box = new THREE.Box3().setFromObject(obj);
-  const center = new THREE.Vector3();
-  const size   = new THREE.Vector3();
-  box.getCenter(center);
-  box.getSize(size);
-  const maxDim = Math.max(size.x, size.y, size.z) || 1;
-  const s = 2.0 / maxDim;
-  obj.scale.setScalar(s);
-  // After scaling, center in world space is center*s → offset position
-  obj.position.set(-center.x * s, -center.y * s, -center.z * s);
-}
-
-// ── GLTF loader ───────────────────────────────────────────────────────────────
+// ── GLTF loader: clone → normalize in useMemo (visible on first frame) ────────
 function GLTFModel({ url, wireframe }: { url: string; wireframe: boolean }) {
   const { scene } = useGLTF(url);
-  useEffect(() => {
-    normalizeObject(scene);
-    scene.traverse((child) => {
+
+  // Clone so we NEVER mutate the useGLTF internal cache.
+  // useMemo runs synchronously before the first render → model is always visible.
+  const normalized = useMemo(() => {
+    const cloned = scene.clone(true);
+    cloned.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(cloned);
+    if (!box.isEmpty()) {
+      const center = new THREE.Vector3();
+      const size   = new THREE.Vector3();
+      box.getCenter(center);
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const s = 2.0 / maxDim;
+      cloned.scale.setScalar(s);
+      cloned.position.set(-center.x * s, -center.y * s, -center.z * s);
+    }
+
+    // Clone materials so wireframe changes don't leak across instances
+    cloned.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow    = true;
       mesh.receiveShadow = true;
+      if (Array.isArray(mesh.material)) {
+        mesh.material = mesh.material.map((m) => {
+          const c = m.clone() as THREE.MeshStandardMaterial;
+          if (c.isMeshStandardMaterial) c.envMapIntensity = 1.0;
+          return c;
+        });
+      } else {
+        const c = (mesh.material as THREE.Material).clone() as THREE.MeshStandardMaterial;
+        if (c.isMeshStandardMaterial) c.envMapIntensity = 1.0;
+        mesh.material = c;
+      }
+    });
+    return cloned;
+  }, [scene]);
+
+  // Wireframe toggle — no need to re-clone
+  useEffect(() => {
+    normalized.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      mats.forEach((m: THREE.Material) => {
-        const std = m as THREE.MeshStandardMaterial;
-        if (std.isMeshStandardMaterial) {
-          std.wireframe      = wireframe;
-          std.envMapIntensity = 1.0;
-          std.needsUpdate    = true;
-        } else {
-          // Fallback for non-standard materials (e.g. MeshBasicMaterial in some GLTFs)
-          (m as any).wireframe = wireframe;
-        }
+      mats.forEach((m) => {
+        (m as any).wireframe = wireframe;
+        (m as THREE.MeshStandardMaterial).needsUpdate = true;
       });
     });
-  }, [scene, wireframe]);
-  return <primitive object={scene} />;
+  }, [normalized, wireframe]);
+
+  return <primitive object={normalized} />;
 }
 
-// ── OBJ loader ────────────────────────────────────────────────────────────────
+// ── OBJ loader: clone → normalize in useMemo ──────────────────────────────────
 function OBJModel({ url, wireframe }: { url: string; wireframe: boolean }) {
   const obj = useLoader(OBJLoader, url);
-  useEffect(() => {
-    normalizeObject(obj);
-    obj.traverse((child) => {
+
+  const normalized = useMemo(() => {
+    const cloned = obj.clone(true);
+    cloned.updateMatrixWorld(true);
+
+    const box = new THREE.Box3().setFromObject(cloned);
+    if (!box.isEmpty()) {
+      const center = new THREE.Vector3();
+      const size   = new THREE.Vector3();
+      box.getCenter(center);
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const s = 2.0 / maxDim;
+      cloned.scale.setScalar(s);
+      cloned.position.set(-center.x * s, -center.y * s, -center.z * s);
+    }
+
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: 0xcccccc, roughness: 0.45, metalness: 0.1, envMapIntensity: 1.0,
+    });
+    cloned.traverse((child) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.material = new THREE.MeshStandardMaterial({
-        color: 0xcccccc, roughness: 0.45, metalness: 0.1,
-        envMapIntensity: 1.0, wireframe,
-      });
+      mesh.material      = baseMat.clone();
       mesh.castShadow    = true;
       mesh.receiveShadow = true;
     });
-  }, [obj, wireframe]);
-  return <primitive object={obj} />;
+    return cloned;
+  }, [obj]);
+
+  useEffect(() => {
+    normalized.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      (mesh.material as THREE.MeshStandardMaterial).wireframe   = wireframe;
+      (mesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
+    });
+  }, [normalized, wireframe]);
+
+  return <primitive object={normalized} />;
 }
 
 function ModelMesh({ url, ext, wireframe }: { url: string; ext: string; wireframe: boolean }) {
@@ -304,6 +348,7 @@ function ModelMesh({ url, ext, wireframe }: { url: string; ext: string; wirefram
     ? <OBJModel url={url} wireframe={wireframe} />
     : <GLTFModel url={url} wireframe={wireframe} />;
 }
+
 
 // ── Turntable auto-rotate ─────────────────────────────────────────────────────
 function Turntable({ active, speed = 0.4 }: { active: boolean; speed?: number }) {
@@ -849,9 +894,19 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
   const [error, setError] = useState<string | null>(null);
 
   const fetchEntries = useCallback(async () => {
-    const { data, error } = await supabase.from("guestbook").select("*").order("created_at", { ascending: false }).limit(50);
-    if (!error && data) setEntries(data as GuestbookEntry[]);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("guestbook")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setEntries((data as GuestbookEntry[]) ?? []);
+    } catch (err: any) {
+      console.error("[Guestbook] fetch error:", err?.message ?? err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -870,14 +925,37 @@ function GuestbookSection({ sectionRef }: { sectionRef: React.RefObject<HTMLElem
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.content.trim()) return;
-    setSubmitting(true); setError(null);
-    const optimistic: GuestbookEntry = { ...form, id: Date.now(), created_at: new Date().toISOString(), optimistic: true };
+    setSubmitting(true);
+    setError(null);
+
+    // Optimistic update — show immediately
+    const optimistic: GuestbookEntry = {
+      ...form,
+      id: Date.now(),
+      created_at: new Date().toISOString(),
+      optimistic: true,
+    };
     setEntries((prev) => [optimistic, ...prev]);
+    const snapshot = { ...form };
     setForm({ name: "", content: "", color: GUESTBOOK_COLORS[0] });
-    
-    const { error: dbErr } = await supabase.from("guestbook").insert({ name: form.name.trim(), content: form.content.trim(), color: form.color });
-    if (dbErr) { setError(dbErr.message); setEntries((prev) => prev.filter((e) => !e.optimistic)); }
-    setSubmitting(false);
+
+    try {
+      const { error: dbErr } = await supabase
+        .from("guestbook")
+        .insert({
+          name:    snapshot.name.trim(),
+          content: snapshot.content.trim(),
+          color:   snapshot.color,
+        });
+      if (dbErr) throw dbErr;
+      // Remove optimistic flag — real row will arrive via realtime channel
+      setEntries((prev) => prev.map((e) => e.optimistic ? { ...e, optimistic: false } : e));
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to post. Please try again.");
+      setEntries((prev) => prev.filter((e) => !e.optimistic));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -972,10 +1050,19 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
   const [error, setError] = useState<string | null>(null);
 
   const fetchCritics = useCallback(async () => {
-    const { data, error } = await supabase.from("critics").select("*").order("created_at", { ascending: false }).limit(100);
-    if (!error && data) setCritics(data as CriticEntry[]);
-    else if (error) setError(error.message);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("critics")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setCritics((data as CriticEntry[]) ?? []);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to load feedback.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -1079,10 +1166,22 @@ function CriticPopover({ popover, onClose, onSubmit }: CriticPopoverProps) {
     e.preventDefault();
     if (!form.name.trim() || !form.comment.trim()) return;
     setSubmitting(true);
-    await onSubmit({ name: form.name.trim(), x_coord: popover.canvasX, y_coord: popover.canvasY, category: form.category, comment: form.comment.trim(), rating: form.rating });
-    setForm({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
-    setSubmitting(false);
-    onClose();
+    try {
+      await onSubmit({
+        name:     form.name.trim(),
+        x_coord:  popover.canvasX,
+        y_coord:  popover.canvasY,
+        category: form.category,
+        comment:  form.comment.trim(),
+        rating:   form.rating,
+      });
+      setForm({ name: "", category: CRITIC_CATEGORIES[0], comment: "", rating: 3 });
+      onClose();
+    } catch (err: any) {
+      console.error("[CriticPopover] submit error:", err?.message ?? err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const left = typeof window !== "undefined" ? Math.min(popover.x, window.innerWidth - 290) : popover.x;
@@ -1195,8 +1294,19 @@ export default function ThreeDMoodApp() {
   };
 
   const handleCriticSubmit = async (data: Omit<CriticEntry, "id" | "created_at">) => {
-    const { error } = await supabase.from("critics").insert(data);
-    if (error) console.error("Critic insert:", error.message);
+    try {
+      const { error } = await supabase.from("critics").insert({
+        name:     data.name,
+        x_coord:  data.x_coord,
+        y_coord:  data.y_coord,
+        category: data.category,
+        comment:  data.comment,
+        rating:   data.rating,
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("[Critics] insert error:", err?.message ?? err);
+    }
   };
   
   const handleFileUpload = (file: File) => {
