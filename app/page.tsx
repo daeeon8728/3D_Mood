@@ -16,7 +16,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 // ─── 3D ENGINE IMPORTS ────────────────────────────────────────────────────────
 import * as THREE from "three";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
-import { useGLTF, OrbitControls, Environment, SoftShadows, ContactShadows, useProgress } from "@react-three/drei";
+import { useGLTF, OrbitControls, Environment, SoftShadows, ContactShadows, Center } from "@react-three/drei";
 import { OBJLoader } from "three-stdlib";
 
 // ─── Supabase — hardcoded per spec (publishable anon key, safe for frontend) ──
@@ -239,186 +239,206 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }: Drawer
 //  3D WEBGL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Types for scene fit state
-interface FitState {
-  center: THREE.Vector3;
-  radius: number;
-  baseDistance: number;
-}
+// Types
+interface FitState { radius: number; baseDistance: number; }
 
-// ── Auto-fit camera + orbit pivot around model center ──────────────────────
-function SceneAutoFit({
-  onFit,
-  sceneRef,
-}: {
-  onFit: (f: FitState) => void;
-  sceneRef: React.RefObject<THREE.Group | null>;
-}) {
-  const { camera } = useThree();
-  const fitted = useRef(false);
-
-  useFrame(() => {
-    if (fitted.current || !sceneRef.current) return;
-    const box = new THREE.Box3().setFromObject(sceneRef.current);
-    if (box.isEmpty()) return;
-
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-
-    // Shift the scene group so bbox center is at world origin
-    sceneRef.current.position.sub(center);
-
-    const sphere = new THREE.Sphere();
-    box.getBoundingSphere(sphere);
-    const r = sphere.radius;
-
-    // Camera sits at 2.5x radius, slightly elevated
-    const dist = r * 2.5;
-    camera.position.set(dist * 0.6, dist * 0.35, dist);
-    camera.lookAt(0, 0, 0);
-    camera.near = r * 0.01;
-    camera.far = r * 100;
-    camera.updateProjectionMatrix();
-
-    fitted.current = true;
-    onFit({ center: new THREE.Vector3(0, 0, 0), radius: r, baseDistance: dist });
-  });
-
-  return null;
-}
-
-// ── Smooth zoom: moves camera closer/further along current direction ────────
-function ZoomRig({ targetDistance }: { targetDistance: number }) {
-  const { camera } = useThree();
-  useFrame(() => {
-    const currentDist = camera.position.length();
-    if (Math.abs(currentDist - targetDistance) < 0.001) return;
-    const scale = THREE.MathUtils.lerp(currentDist, targetDistance, 0.1) / currentDist;
-    camera.position.multiplyScalar(scale);
-  });
-  return null;
-}
-
-// ── GLTF model: load, enable shadows on every mesh ────────────────────────
+// ── GLTF: enable shadows + keep original materials ───────────────────────────
 function GLTFModel({ url }: { url: string }) {
   const { scene } = useGLTF(url);
   useEffect(() => {
     scene.traverse((child) => {
       const mesh = child as THREE.Mesh;
-      if (mesh.isMesh) {
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        // Ensure materials respond to light
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((mat) => {
-            if ((mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-              (mat as THREE.MeshStandardMaterial).needsUpdate = true;
-            }
-          });
-        } else if ((mesh.material as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-          (mesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m: THREE.Material) => {
+        const std = m as THREE.MeshStandardMaterial;
+        if (std.isMeshStandardMaterial) {
+          std.envMapIntensity = 1.0;
+          std.needsUpdate = true;
         }
-      }
+      });
     });
   }, [scene]);
   return <primitive object={scene} />;
 }
 
-// ── OBJ model: load + apply PBR material + enable shadows ─────────────────
+// ── OBJ: auto PBR material ─────────────────────────────────────────────────
 function OBJModel({ url }: { url: string }) {
   const obj = useLoader(OBJLoader, url);
   useEffect(() => {
     obj.traverse((child) => {
       const mesh = child as THREE.Mesh;
-      if (mesh.isMesh) {
-        mesh.material = new THREE.MeshStandardMaterial({
-          color: 0xd0d0d0,
-          roughness: 0.45,
-          metalness: 0.15,
-          envMapIntensity: 1.2,
-        });
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-      }
+      if (!mesh.isMesh) return;
+      mesh.material = new THREE.MeshStandardMaterial({
+        color: 0xc8c8c8, roughness: 0.5, metalness: 0.1, envMapIntensity: 1.0,
+      });
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
     });
   }, [obj]);
   return <primitive object={obj} />;
 }
 
-function ModelLoader({ url, ext }: { url: string; ext: string }) {
-  if (ext === "obj") return <OBJModel url={url} />;
-  return <GLTFModel url={url} />;
+function ModelMesh({ url, ext }: { url: string; ext: string }) {
+  return ext === "obj" ? <OBJModel url={url} /> : <GLTFModel url={url} />;
 }
 
-// ── Multi-layer studio lighting ───────────────────────────────────────────
+// ── Smooth zoom along current camera direction ────────────────────────────
+function ZoomRig({ target }: { target: number }) {
+  const { camera } = useThree();
+  useFrame(() => {
+    const cur = camera.position.length();
+    if (Math.abs(cur - target) < 0.001) return;
+    camera.position.multiplyScalar(THREE.MathUtils.lerp(cur, target, 0.1) / cur);
+  });
+  return null;
+}
+
+// ── Multi-layer photorealistic studio lighting ───────────────────────────
 function MoodLight({ lighting, radius }: { lighting: LightingState; radius: number }) {
   const { intensity, color, angle, direction } = lighting;
-  const r = Math.max(radius, 1); // safety floor
+  const r = Math.max(radius, 0.5);
+  const ld = r * 4; // light distance
 
-  // Primary light position scaled to scene size
-  const dist = r * 3.5;
   const pos: [number, number, number] =
-    direction === "top"   ? [0,       dist,        r * 0.5] :
-    direction === "front" ? [0,       dist * 0.5,  dist   ] :
-    direction === "back"  ? [0,       dist * 0.5, -dist   ] :
-    direction === "left"  ? [-dist,   dist * 0.5,  0      ] :
-                            [dist,    dist * 0.5,  0      ];
+    direction === "top"   ? [r * 0.3, ld,       r * 0.3 ] :
+    direction === "front" ? [0,       ld * 0.5, ld      ] :
+    direction === "back"  ? [0,       ld * 0.5, -ld     ] :
+    direction === "left"  ? [-ld,     ld * 0.5, r * 0.2 ] :
+                            [ld,      ld * 0.5, r * 0.2 ];
 
-  // Fill from opposite-ish direction at lower intensity
-  const fill: [number, number, number] = [
-    -pos[0] * 0.3,
-    pos[1]  * 0.5,
-    -pos[2] * 0.3,
-  ];
-
-  const mainIntensity  = (intensity / 100) * 60 * r;
-  const fillIntensity  = (intensity / 100) * 10 * r;
-  const shadowMapSize: [number, number] = [4096, 4096];
+  const mainInt = (intensity / 100) * 55 * r;
+  const fillInt = (intensity / 100) * 8  * r;
+  const rimInt  = (intensity / 100) * 4  * r;
 
   return (
     <>
-      {/* Sky/ground ambient — keeps shadows from going pitch black */}
-      <hemisphereLight
-        color="#ddeeff"
-        groundColor="#110a1a"
-        intensity={0.5}
-      />
+      {/* Ambient sky/ground gradient — prevents pitch-black shadows */}
+      <hemisphereLight color="#c8d8ff" groundColor="#0d0510" intensity={0.45} />
 
-      {/* Key (mood) spotlight */}
+      {/* Key spotlight — the mood light, casts crisp shadows */}
       <spotLight
         position={pos}
         target-position={[0, 0, 0]}
-        angle={(Math.min(angle, 72) * Math.PI) / 180}
-        penumbra={0.65}
+        angle={(Math.min(angle, 68) * Math.PI) / 180}
+        penumbra={0.7}
         color={color}
-        intensity={mainIntensity}
+        intensity={mainInt}
         castShadow
-        shadow-mapSize={shadowMapSize}
-        shadow-bias={-0.00005}
+        shadow-mapSize={[4096, 4096]}
+        shadow-bias={-0.00003}
         shadow-camera-near={r * 0.1}
-        shadow-camera-far={dist * 3}
+        shadow-camera-far={ld * 4}
         decay={2}
-        distance={dist * 3}
+        distance={ld * 4}
       />
 
-      {/* Soft fill — coloured to the mood but much dimmer */}
+      {/* Soft fill — opposite side, coloured, no shadow */}
       <directionalLight
-        position={fill}
+        position={[-pos[0] * 0.4, pos[1] * 0.3, -pos[2] * 0.4]}
         color={color}
-        intensity={fillIntensity}
-        castShadow={false}
+        intensity={fillInt}
       />
 
-      {/* Subtle cool rim from behind to separate model from background */}
+      {/* Cool blue-white rim from behind — separates model from BG */}
       <directionalLight
-        position={[
-          -pos[0] * 0.2,
-          pos[1]  * 0.2 + r,
-          -pos[2] * 0.2 - dist * 0.6,
-        ]}
-        color="#88aaff"
-        intensity={fillIntensity * 0.5}
-        castShadow={false}
+        position={[pos[0] * 0.1, r * 0.5, -ld * 0.8]}
+        color="#a0c0ff"
+        intensity={rimInt}
+      />
+    </>
+  );
+}
+
+// ── Full 3D Scene: centering, lights, controls — all in one component ───────
+interface Scene3DProps {
+  url: string;
+  ext: string;
+  lighting: LightingState;
+  zoomMult: number;
+  onFit: (f: FitState) => void;
+  fitState: FitState | null;
+}
+function Scene3D({ url, ext, lighting, zoomMult, onFit, fitState }: Scene3DProps) {
+  const { camera } = useThree();
+  const orbitRef = useRef<any>(null);
+  const { color: sColor } = lighting;
+  const r = fitState?.radius ?? 1;
+  const targetDist = (fitState?.baseDistance ?? 5) * zoomMult;
+
+  return (
+    <>
+      {/* Soft PCSS shadow kernel */}
+      <SoftShadows size={14} samples={20} focus={0.9} />
+
+      {/* HDR environment for PBR reflections */}
+      <Environment preset="warehouse" environmentIntensity={0.35} />
+
+      {/* Mood lights */}
+      <MoodLight lighting={lighting} radius={r} />
+
+      {/* Zoom rig */}
+      {fitState && <ZoomRig target={targetDist} />}
+
+      <Suspense fallback={null}>
+        {/*
+          Center auto-centers its children at world origin.
+          onCentered fires once with bounding sphere after positioning.
+          This is the correct, battle-tested drei pattern.
+        */}
+        <Center
+          onCentered={({ boundingSphere, center }) => {
+            const radius = boundingSphere.radius || 1;
+            const dist = radius * 2.6;
+
+            // Position camera to see the whole model
+            camera.position.set(dist * 0.65, dist * 0.38, dist);
+            camera.near = radius * 0.005;
+            camera.far  = radius * 200;
+            camera.lookAt(0, 0, 0);
+            camera.updateProjectionMatrix();
+
+            // Orbit target = world origin (Center put everything there)
+            if (orbitRef.current) {
+              orbitRef.current.target.set(0, 0, 0);
+              orbitRef.current.update();
+            }
+
+            onFit({ radius, baseDistance: dist });
+          }}
+        >
+          <ModelMesh url={url} ext={ext} />
+        </Center>
+
+        {/* Realistic contact shadow on virtual floor */}
+        <ContactShadows
+          position={[0, -r, 0]}
+          opacity={0.6}
+          scale={r * 7}
+          blur={r * 1.5}
+          far={r * 2.2}
+          color={sColor}
+        />
+      </Suspense>
+
+      {/*
+        OrbitControls — target (0,0,0) = model center (set by Center above)
+        enableDamping gives the smooth deceleration feel
+        rotateSpeed 0.5 so even large models don't fly off screen
+      */}
+      <OrbitControls
+        ref={orbitRef}
+        target={[0, 0, 0]}
+        enableZoom={false}
+        enablePan={false}
+        minPolarAngle={0.05}
+        maxPolarAngle={Math.PI * 0.55}
+        rotateSpeed={0.5}
+        dampingFactor={0.07}
+        enableDamping
+        makeDefault
       />
     </>
   );
@@ -440,23 +460,12 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const sceneGroupRef = useRef<THREE.Group | null>(null);
 
-  // Fit state — set once the model's bounding sphere is computed
   const [fitState, setFitState] = useState<FitState | null>(null);
-  // Zoom: expressed as a multiplier on baseDistance (1 = default, 0.4 = close, 2.5 = far)
   const [zoomMult, setZoomMult] = useState(1);
   const isDraggingZoom = useRef(false);
 
-  // When a new file is picked, reset fit + zoom
-  const prevFileUrl = useRef<string | null>(null);
-  useEffect(() => {
-    if (fileUrl !== prevFileUrl.current) {
-      prevFileUrl.current = fileUrl;
-      setFitState(null);
-      setZoomMult(1);
-    }
-  }, [fileUrl]);
+  useEffect(() => { setFitState(null); setZoomMult(1); }, [fileUrl]);
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault(); setIsDragOver(false);
@@ -508,55 +517,21 @@ function HeroCanvas({ lighting, criticMode, onCanvasClick, fileUrl, fileExt, fil
         {fileUrl ? (
           <Canvas
             shadows="soft"
-            camera={{ position: [0, 2, 5], fov: 38 }}
+            camera={{ position: [0, 2, 8], fov: 38 }}
             gl={{
               antialias: true,
               toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.1,
+              toneMappingExposure: 1.05,
               outputColorSpace: THREE.SRGBColorSpace,
             }}
           >
-            {/* Soft shadow kernel for realistic shadow edges */}
-            <SoftShadows size={12} samples={16} focus={0.8} />
-
-            {/* Fit camera to model, then enable zoom */}
-            <SceneAutoFit sceneRef={sceneGroupRef} onFit={setFitState} />
-            {fitState && <ZoomRig targetDistance={targetDist} />}
-
-            {/* Environment map for PBR reflections */}
-            <Environment preset="studio" environmentIntensity={0.5} />
-
-            {/* Mood lighting — scaled to actual model radius */}
-            <MoodLight lighting={lighting} radius={r} />
-
-            <Suspense fallback={null}>
-              {/* Group for centering — SceneAutoFit will adjust its .position */}
-              <group ref={sceneGroupRef}>
-                <ModelLoader url={fileUrl} ext={fileExt!} />
-              </group>
-
-              {/* Contact shadow on floor — scales with model */}
-              <ContactShadows
-                position={[0, -r * 0.01, 0]}
-                opacity={0.55}
-                scale={r * 6}
-                blur={r * 1.2}
-                far={r * 2}
-                color={sColor}
-              />
-            </Suspense>
-
-            {/* Orbit controls — target is world origin (= model center after auto-fit) */}
-            <OrbitControls
-              target={[0, 0, 0]}
-              enableZoom={false}
-              enablePan={false}
-              minPolarAngle={0.08}
-              maxPolarAngle={Math.PI * 0.52}
-              rotateSpeed={0.6}
-              dampingFactor={0.08}
-              enableDamping
-              makeDefault
+            <Scene3D
+              url={fileUrl}
+              ext={fileExt!}
+              lighting={lighting}
+              zoomMult={zoomMult}
+              fitState={fitState}
+              onFit={setFitState}
             />
           </Canvas>
         ) : (
