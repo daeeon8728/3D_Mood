@@ -308,30 +308,10 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
   // ── Studio 3-Point Lighting & Material ──────────────────────────────────────
   useEffect(() => {
-    const app = splineAppRef.current;
-    if (!app) return;
-    try {
-      app.setVariable?.("MaterialMode", materialMode);
-      
-      app.setVariable?.("KeyLightIntensity", studioLights.key.intensity);
-      app.setVariable?.("KeyLightColor", studioLights.key.color);
-      app.setVariable?.("FillLightIntensity", studioLights.fill.intensity);
-      app.setVariable?.("FillLightColor", studioLights.fill.color);
-      app.setVariable?.("RimLightIntensity", studioLights.rim.intensity);
-      app.setVariable?.("RimLightColor", studioLights.rim.color);
-
-      if (app.findObjectByName) {
-        const keyL = app.findObjectByName("Key Light");
-        if (keyL) { keyL.intensity = studioLights.key.intensity; if (keyL.color?.set) keyL.color.set(studioLights.key.color); }
-        
-        const fillL = app.findObjectByName("Fill Light");
-        if (fillL) { fillL.intensity = studioLights.fill.intensity; if (fillL.color?.set) fillL.color.set(studioLights.fill.color); }
-        
-        const rimL = app.findObjectByName("Rim Light");
-        if (rimL) { rimL.intensity = studioLights.rim.intensity; if (rimL.color?.set) rimL.color.set(studioLights.rim.color); }
-      }
-    } catch (_) {}
-  }, [studioLights, materialMode, isLoaded]);
+    // As per user request, we no longer interact with Spline variables for lighting/materials.
+    // The CSS filters and background gradients handle all visual FX in real-time.
+    console.log(`[Studio FX] Material: ${materialMode}, Lights Updated`);
+  }, [studioLights, materialMode]);
 
   // SSR guard
   useEffect(() => { 
@@ -520,7 +500,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
       {/* ── Studio 3-Point Lighting Simulation Overlay ── */}
       {isStudioMode && (
-        <div className="absolute inset-0 pointer-events-none z-[-1] mix-blend-screen transition-opacity duration-1000">
+        <div className="absolute inset-0 pointer-events-none z-0 mix-blend-screen transition-opacity duration-1000">
           {/* Key Light */}
           <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%]" style={{
             background: `radial-gradient(circle, ${studioLights.key.color}${Math.round((studioLights.key.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 60%)`
@@ -541,11 +521,11 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         className="absolute inset-0 z-0"
         onContextMenu={e => e.preventDefault()}
         style={{ 
-          filter: containerFilter, 
-          backdropFilter: containerBackdrop,
+          WebkitFilter: containerFilter, filter: containerFilter, 
+          WebkitBackdropFilter: containerBackdrop, backdropFilter: containerBackdrop,
           opacity: containerOpacity,
           transform: `scale(${zoomLevel})`, 
-          transition: "all 1s ease-in-out" 
+          transition: "all 0.5s ease-out" 
         }}>
         {mounted && currentScene.type === "spline" && (
           <Spline
