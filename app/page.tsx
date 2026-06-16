@@ -1541,7 +1541,6 @@ function InteractiveExplodingText({ isExploding }: { isExploding: boolean }) {
       rotation={[0, 0, 0]}
       polar={[-0.1, 0.1]}
       azimuth={[-0.2, 0.2]}
-      config={{ mass: 2, tension: 400 }}
       snap={true}
     >
       <group
