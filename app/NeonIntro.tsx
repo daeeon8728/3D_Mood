@@ -52,28 +52,70 @@ function Spark({ xOffset, yDrop, delay, duration, size, color }: any) {
 function BackgroundWires() {
   return (
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ zIndex: 1 }}>
-      <svg 
-        style={{ width: 0, height: 0, overflow: 'visible', filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.2))' }}
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="-400 -300 800 600"
+        preserveAspectRatio="xMidYMid slice"
+        className="absolute inset-0"
+        style={{
+          overflow: "visible",
+          filter: "drop-shadow(0 3px 5px rgba(0,0,0,0.65))",
+        }}
       >
-        {/* Base Wire: dark cord */}
-        <g stroke="#1a1a1a" strokeWidth="3" fill="none" strokeLinecap="round">
-          {/* Wire 1: From W top-left up to the ceiling */}
-          <path d="M -230 -20 Q -280 -200 -200 -600" />
-          {/* Wire 2: From e bottom-right down to the floor */}
-          <path d="M 225 -15 Q 260 200 150 600" />
-        </g>
-        
-        {/* Metal Clips at the connection points */}
-        <g fill="#777" stroke="#111" strokeWidth="1">
-          {/* Clip at W (-230, -20) */}
-          <rect x="-234" y="-24" width="8" height="12" rx="2" transform="rotate(-15, -230, -20)" />
-          <circle cx="-230" cy="-20" r="1.5" fill="#111" />
-
-          {/* Clip at e (225, -15) */}
-          <rect x="221" y="-19" width="8" height="12" rx="2" transform="rotate(15, 225, -15)" />
-          <circle cx="225" cy="-15" r="1.5" fill="#111" />
+        <g fill="none" strokeLinecap="round">
+          <path
+            d="M -230 -34 C -305 -95 -330 -190 -285 -330 C -260 -410 -225 -500 -250 -650"
+            stroke="#2a2a2a"
+            strokeWidth="7"
+          />
+          <path
+            d="M 210 -20 C 290 -75 350 -130 430 -155 C 540 -190 650 -175 820 -245"
+            stroke="#2a2a2a"
+            strokeWidth="7"
+          />
+          <path
+            d="M -230 -34 C -305 -95 -330 -190 -285 -330 C -260 -410 -225 -500 -250 -650"
+            stroke="rgba(255,255,255,0.16)"
+            strokeWidth="2"
+            transform="translate(-1 -1)"
+          />
+          <path
+            d="M 210 -20 C 290 -75 350 -130 430 -155 C 540 -190 650 -175 820 -245"
+            stroke="rgba(255,255,255,0.16)"
+            strokeWidth="2"
+            transform="translate(-1 -1)"
+          />
         </g>
       </svg>
+
+      <div
+        className="absolute"
+        style={{
+          left: "calc(50% - 230px)",
+          top: "calc(50% - 34px)",
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          background: "radial-gradient(circle at 35% 30%, #f1f1f1 0%, #9a9a9a 38%, #4b4b4b 100%)",
+          border: "1px solid rgba(255,255,255,0.35)",
+          boxShadow: "0 2px 5px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.45)",
+        }}
+      />
+
+      <div
+        className="absolute"
+        style={{
+          left: "calc(50% + 210px)",
+          top: "calc(50% - 20px)",
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          background: "radial-gradient(circle at 35% 30%, #f1f1f1 0%, #9a9a9a 38%, #4b4b4b 100%)",
+          border: "1px solid rgba(255,255,255,0.35)",
+          boxShadow: "0 2px 5px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.45)",
+        }}
+      />
     </div>
   );
 }
