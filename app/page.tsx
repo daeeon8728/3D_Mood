@@ -1421,255 +1421,96 @@ function CriticPopover({ popover, onClose, onSubmit }:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  3D CINEMATIC ENTRANCE
+//  NEON SIGN CINEMATIC ENTRANCE
 // ─────────────────────────────────────────────────────────────────────────────
-const FONT_URL = "https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
+function NeonIntro({ onExplore }: { onExplore: () => void }) {
+  const [clicked, setClicked] = useState(false);
 
-function InteractiveText() {
-  const groupRef = useRef<THREE.Group>(null);
-  const { mouse } = useThree();
-  const letters = "WELCOME".split("");
-
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const smoothMouseX = useSpring(mouseX, { stiffness: 120, damping: 15 });
-  const smoothMouseY = useSpring(mouseY, { stiffness: 120, damping: 15 });
-
-  useFrame(() => {
-    if (!groupRef.current) return;
-    
-    // update framer-motion values
-    mouseX.set(mouse.x);
-    mouseY.set(mouse.y);
-    
-    const curX = smoothMouseX.get();
-    const curY = smoothMouseY.get();
-
-    const expansion = Math.abs(curX) * 2.5;
-    
-    groupRef.current.children.forEach((child, i) => {
-      const offsetFromCenter = i - 3;
-      
-      const targetX = offsetFromCenter * (1.6 + expansion);
-      child.position.x = targetX;
-      
-      const targetY = Math.sin(Date.now() * 0.001 + i) * 0.15;
-      child.position.y = targetY;
-      
-      const targetRotY = offsetFromCenter * curX * 0.2;
-      const targetRotX = curY * 0.2;
-      const targetRotZ = offsetFromCenter * curX * -0.05;
-      
-      child.rotation.x = targetRotX;
-      child.rotation.y = targetRotY;
-      child.rotation.z = targetRotZ;
-    });
-  });
-
-  return (
-    <group ref={groupRef} position={[0, 1.5, 0]}>
-      {letters.map((char, i) => (
-        <group key={i}>
-          <Center>
-            <Text3D
-              font={FONT_URL}
-              size={2.2}
-              height={1.0}
-              curveSegments={32}
-              bevelEnabled={true}
-              bevelThickness={0.05}
-              bevelSize={0.03}
-              bevelOffset={0}
-              bevelSegments={10}
-              castShadow
-              receiveShadow
-            >
-              {char}
-              <meshPhysicalMaterial 
-                color="#ffffff"
-                transmission={0.9}
-                thickness={0.5}
-                roughness={0.05}
-                metalness={0.1}
-                clearcoat={1.0}
-                clearcoatRoughness={0.1}
-                envMapIntensity={2.5}
-              />
-            </Text3D>
-          </Center>
-        </group>
-      ))}
-    </group>
-  );
-}
-
-function ExploreButton({ onClick, visible }: { onClick: () => void, visible: boolean }) {
-  const [hovered, setHovered] = useState(false);
-  const groupRef = useRef<THREE.Group>(null);
-  
-  useFrame(() => {
-    if (groupRef.current) {
-      const targetScale = hovered ? 1.05 : 1.0;
-      groupRef.current.scale.setScalar(THREE.MathUtils.lerp(groupRef.current.scale.x, targetScale, 0.1));
-      
-      // Floating effect
-      groupRef.current.position.y = THREE.MathUtils.lerp(
-        groupRef.current.position.y,
-        -3.0 + Math.sin(Date.now() * 0.002) * 0.15,
-        0.1
-      );
-    }
-  });
-
-  if (!visible) return null;
-
-  return (
-    <group ref={groupRef} position={[0, -3.0, 0]}>
-      <mesh 
-        rotation={[0, 0, Math.PI / 2]} 
-        onPointerOver={() => { setHovered(true); document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'default'; }}
-        onClick={() => { document.body.style.cursor = 'default'; onClick(); }}
-        castShadow
-      >
-        <capsuleGeometry args={[0.7, 3.8, 16, 32]} />
-        <meshPhysicalMaterial 
-          color="#050505" 
-          metalness={0.9} 
-          roughness={0.15}
-          clearcoat={1.0}
-        />
-      </mesh>
-
-      {/* Wireframe glowing accent */}
-      <mesh rotation={[0, 0, Math.PI / 2]}>
-        <capsuleGeometry args={[0.72, 3.82, 16, 32]} />
-        <meshBasicMaterial 
-          color={hovered ? "#ff2a85" : "#4a90e2"} 
-          wireframe 
-          transparent 
-          opacity={hovered ? 0.5 : 0.15} 
-        />
-      </mesh>
-      
-      <group position={[0, 0, 0.7]}>
-        <Center>
-          <Text3D font={FONT_URL} size={0.35} height={0.1} curveSegments={24} bevelEnabled bevelThickness={0.01} bevelSize={0.01}>
-            EXPLORE
-            <meshStandardMaterial 
-              color={hovered ? "#ffffff" : "#cccccc"} 
-              emissive={hovered ? "#ff2a85" : "#4a90e2"} 
-              emissiveIntensity={hovered ? 1.5 : 0.8} 
-            />
-          </Text3D>
-        </Center>
-      </group>
-    </group>
-  );
-}
-
-function RippleOverlay({ active, onComplete }: { active: boolean; onComplete: () => void }) {
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const { viewport } = useThree();
-
-  useFrame((state, delta) => {
-    if (active && materialRef.current) {
-      materialRef.current.uniforms.uRadius.value += delta * 2.0; 
-      if (materialRef.current.uniforms.uRadius.value > 2.5) {
-        onComplete();
+  const flickerVariants = {
+    initial: { opacity: 0, textShadow: "none" },
+    animate: {
+      opacity: [0, 1, 0.3, 1, 0, 1, 0.8, 1],
+      textShadow: [
+        "none",
+        "0 0 5px #fff, 0 0 20px #ff2a85, 0 0 40px #4a90e2",
+        "none",
+        "0 0 5px #fff, 0 0 20px #ff2a85, 0 0 40px #4a90e2",
+        "none",
+        "0 0 5px #fff, 0 0 10px #fff, 0 0 20px #ff2a85, 0 0 40px #ff2a85, 0 0 80px #4a90e2, 0 0 120px #4a90e2",
+        "0 0 2px #fff, 0 0 10px #ff2a85, 0 0 20px #4a90e2",
+        "0 0 5px #fff, 0 0 10px #fff, 0 0 20px #ff2a85, 0 0 40px #ff2a85, 0 0 80px #4a90e2, 0 0 120px #4a90e2"
+      ],
+      transition: {
+        duration: 1.5,
+        times: [0, 0.1, 0.15, 0.25, 0.3, 0.4, 0.7, 1],
+        ease: "easeInOut"
       }
+    },
+    exit: { 
+      opacity: 0,
+      scale: 1.05,
+      filter: "brightness(0) blur(15px)",
+      transition: { duration: 0.5, ease: "easeOut" } 
     }
-  });
+  };
 
-  const uniforms = useRef({
-    uRadius: { value: 0.0 },
-    uColor: { value: new THREE.Color("#000000") },
-    uAspect: { value: viewport.width / viewport.height }
-  });
-
-  return (
-    <mesh position={[0, 0, 8]}>
-      <planeGeometry args={[viewport.width * 2, viewport.height * 2]} />
-      <shaderMaterial
-        ref={materialRef}
-        transparent={true}
-        depthWrite={false}
-        uniforms={uniforms.current}
-        vertexShader={`
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `}
-        fragmentShader={`
-          uniform float uRadius;
-          uniform vec3 uColor;
-          uniform float uAspect;
-          varying vec2 vUv;
-          void main() {
-            vec2 center = vec2(0.5);
-            vec2 st = vUv;
-            st.x *= uAspect;
-            center.x *= uAspect;
-            float dist = distance(st, center);
-            float inside = step(dist, uRadius);
-            gl_FragColor = vec4(uColor, inside);
-          }
-        `}
-      />
-    </mesh>
-  );
-}
-
-function ThreeDIntro({ onExplore }: { onExplore: () => void }) {
-  const [showExplore, setShowExplore] = useState(false);
-  const [rippleActive, setRippleActive] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowExplore(true), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleExploreClick = () => {
-    setRippleActive(true);
+  const handleNeonClick = () => {
+    if (clicked) return;
+    setClicked(true);
+    // 0.5초 동안 네온 꺼짐 모션 -> 0.5초 암전 후 메인 앱
+    setTimeout(() => {
+      onExplore();
+    }, 1000);
   };
 
   return (
-    <motion.div
-      className="fixed inset-0 z-[100] bg-[#030303]"
-      exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
-    >
-      <Canvas camera={{ position: [0, 0, 16], fov: 45 }} dpr={[1, 2]} shadows>
-        <color attach="background" args={["#000000"]} />
-        <Environment preset="studio" />
+    <>
+      <style>
+        {`@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');`}
+      </style>
+      <motion.div
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center cursor-pointer overflow-hidden"
+        style={{
+          backgroundColor: "#0a0a0a",
+          backgroundImage: `radial-gradient(circle at center, transparent 0%, #000 100%), url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`
+        }}
+        exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
+        onClick={handleNeonClick}
+      >
+        <AnimatePresence>
+          {!clicked && (
+            <motion.h1
+              variants={flickerVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="text-7xl md:text-[9rem] select-none"
+              style={{
+                fontFamily: "'Great Vibes', cursive",
+                lineHeight: 1.2,
+                color: "#ffe6f2"
+              }}
+            >
+              Welcome
+            </motion.h1>
+          )}
+        </AnimatePresence>
         
-        {/* 긴 그림자를 위한 방향광 */}
-        <directionalLight 
-          position={[0, 1, 5]} 
-          intensity={2.5} 
-          color="#ffffff" 
-          castShadow 
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-        />
-        
-        {/* 은은한 엑센트 조명 유지 */}
-        <pointLight position={[0, -10, -5]} intensity={500} color="#4a90e2" />
-        <pointLight position={[10, 0, 5]} intensity={400} color="#ff2a85" />
-        
-        {/* 긴 그림자를 받는 바닥 (shadowMaterial 사용으로 다른 오브젝트를 가리지 않음) */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]} receiveShadow>
-          <planeGeometry args={[100, 100]} />
-          <shadowMaterial transparent opacity={0.6} />
-        </mesh>
-        
-        <InteractiveText />
-        <ExploreButton visible={showExplore} onClick={handleExploreClick} />
-        
-        <RippleOverlay active={rippleActive} onComplete={onExplore} />
-      </Canvas>
-    </motion.div>
+        <AnimatePresence>
+          {!clicked && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              exit={{ opacity: 0 }}
+              transition={{ delay: 2, duration: 1 }}
+              className="absolute bottom-10 text-xs tracking-widest text-white/50 uppercase"
+            >
+              Click anywhere to enter
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </>
   );
 }
 
@@ -1758,7 +1599,7 @@ export default function ThreeDMoodApp() {
     <>
       <AnimatePresence>
         {!introCompleted && (
-          <ThreeDIntro key="intro" onExplore={() => setIntroCompleted(true)} />
+          <NeonIntro key="intro" onExplore={() => setIntroCompleted(true)} />
         )}
       </AnimatePresence>
 
