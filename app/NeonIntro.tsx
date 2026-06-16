@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 
 export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -50,7 +50,7 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
   `;
 
   // Initial striking flicker animation for the entire text block
-  const strikeFlicker = {
+  const strikeFlicker: Variants = {
     initial: { opacity: 0, textShadow: "none", color: "#333" },
     animate: {
       opacity: [0, 1, 0, 1, 0.4, 1, 1],
