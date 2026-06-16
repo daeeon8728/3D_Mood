@@ -60,12 +60,12 @@ function BackgroundWires() {
         className="absolute inset-0"
         style={{
           overflow: "visible",
-          filter: "drop-shadow(0 0 1px rgba(0,0,0,0.5))",
+          filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.6))",
         }}
       >
         <g fill="none" stroke="#1a1a1a" strokeLinecap="round" strokeWidth="1.5">
           <path
-            d="M -230 -34 C -285 8 -330 74 -352 150 C -374 226 -438 306 -560 392"
+            d="M -230 -48 C -170 -102, -78 -88, -42 -38 C -8 10, 76 12, 118 -36 C 158 -82, 224 -72, 226 -10 C 228 54, 192 120, 124 132 C 44 146, -10 92, 10 38"
           />
         </g>
       </svg>
