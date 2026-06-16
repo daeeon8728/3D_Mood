@@ -12,7 +12,7 @@ import React, {
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment, Text3D, Center } from '@react-three/drei';
+import { Environment, Text3D, Center, MeshTransmissionMaterial, Sparkles, PresentationControls } from '@react-three/drei';
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 
@@ -1421,96 +1421,262 @@ function CriticPopover({ popover, onClose, onSubmit }:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  NEON SIGN CINEMATIC ENTRANCE
+//  3D FROSTED GLASS & EXPLOSION INTRANCE
 // ─────────────────────────────────────────────────────────────────────────────
-function NeonIntro({ onExplore }: { onExplore: () => void }) {
-  const [clicked, setClicked] = useState(false);
+const FONT_URL = "https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
 
-  const flickerVariants: any = {
-    initial: { opacity: 0, textShadow: "none" },
-    animate: {
-      opacity: [0, 1, 0.3, 1, 0, 1, 0.8, 1],
-      textShadow: [
-        "none",
-        "0 0 5px #fff, 0 0 20px #ff2a85, 0 0 40px #4a90e2",
-        "none",
-        "0 0 5px #fff, 0 0 20px #ff2a85, 0 0 40px #4a90e2",
-        "none",
-        "0 0 5px #fff, 0 0 10px #fff, 0 0 20px #ff2a85, 0 0 40px #ff2a85, 0 0 80px #4a90e2, 0 0 120px #4a90e2",
-        "0 0 2px #fff, 0 0 10px #ff2a85, 0 0 20px #4a90e2",
-        "0 0 5px #fff, 0 0 10px #fff, 0 0 20px #ff2a85, 0 0 40px #ff2a85, 0 0 80px #4a90e2, 0 0 120px #4a90e2"
-      ],
-      transition: {
-        duration: 1.5,
-        times: [0, 0.1, 0.15, 0.25, 0.3, 0.4, 0.7, 1],
-        ease: "easeInOut"
-      }
-    },
-    exit: { 
-      opacity: 0,
-      scale: 1.05,
-      filter: "brightness(0) blur(15px)",
-      transition: { duration: 0.5, ease: "easeOut" } 
+function ExplodingLetter({ char, isExploding }: { char: string, isExploding: boolean }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  const velocity = useMemo(() => {
+    return new THREE.Vector3(
+      (Math.random() - 0.5) * 40,
+      (Math.random() - 0.1) * 30, // mostly upwards/outwards
+      (Math.random() - 0.5) * 50
+    );
+  }, []);
+  
+  const rotationSpeed = useMemo(() => {
+    return new THREE.Vector3(
+      (Math.random() - 0.5) * 15,
+      (Math.random() - 0.5) * 15,
+      (Math.random() - 0.5) * 15
+    );
+  }, []);
+
+  useFrame((state, delta) => {
+    if (isExploding && meshRef.current) {
+      meshRef.current.position.addScaledVector(velocity, delta);
+      meshRef.current.rotation.x += rotationSpeed.x * delta;
+      meshRef.current.rotation.y += rotationSpeed.y * delta;
+      meshRef.current.rotation.z += rotationSpeed.z * delta;
     }
-  };
+  });
 
-  const handleNeonClick = () => {
-    if (clicked) return;
-    setClicked(true);
-    // 0.5초 동안 네온 꺼짐 모션 -> 0.5초 암전 후 메인 앱
+  return (
+    <Text3D
+      ref={meshRef}
+      font={FONT_URL}
+      size={2.2}
+      height={1.0}
+      curveSegments={32}
+      bevelEnabled
+      bevelThickness={0.05}
+      bevelSize={0.03}
+      bevelOffset={0}
+      bevelSegments={10}
+      castShadow
+      receiveShadow
+    >
+      {char}
+      <MeshTransmissionMaterial 
+        background={new THREE.Color("#000000")}
+        transmission={0.8}
+        roughness={0.2}
+        thickness={0.5}
+        chromaticAberration={0.05}
+        ior={1.5}
+        clearcoat={1}
+      />
+    </Text3D>
+  );
+}
+
+function ExplodingText({ isExploding }: { isExploding: boolean }) {
+  const letters = "WELCOME".split("");
+  const groupRef = useRef<THREE.Group>(null);
+  const [flickerVisible, setFlickerVisible] = useState(false);
+  
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let startTime = Date.now();
+    const duration = 3000;
+    
+    const tick = () => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= duration) {
+        setFlickerVisible(true);
+        return;
+      }
+      const progress = elapsed / duration;
+      const interval = THREE.MathUtils.lerp(400, 30, Math.pow(progress, 2));
+      
+      setFlickerVisible(prev => !prev);
+      timeoutId = setTimeout(tick, interval);
+    };
+    
+    timeoutId = setTimeout(tick, 400);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  return (
+    <group ref={groupRef} position={[0, 1.5, 0]} visible={flickerVisible}>
+      <Center>
+        <group>
+          {letters.map((char, i) => (
+            <group key={i} position={[(i - 3) * 1.8, 0, 0]}>
+              <ExplodingLetter char={char} isExploding={isExploding} />
+            </group>
+          ))}
+        </group>
+      </Center>
+    </group>
+  );
+}
+
+function InteractiveExplodingText({ isExploding }: { isExploding: boolean }) {
+  const [hovered, setHovered] = useState(false);
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    if (groupRef.current && !isExploding) {
+      const targetScale = hovered ? 1.05 : 1.0;
+      groupRef.current.scale.setScalar(THREE.MathUtils.lerp(groupRef.current.scale.x, targetScale, 0.1));
+    }
+  });
+
+  return (
+    <PresentationControls
+      global
+      rotation={[0, 0, 0]}
+      polar={[-0.1, 0.1]}
+      azimuth={[-0.2, 0.2]}
+      config={{ mass: 2, tension: 400 }}
+      snap={{ mass: 4, tension: 400 }}
+    >
+      <group
+        ref={groupRef}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        <ExplodingText isExploding={isExploding} />
+      </group>
+    </PresentationControls>
+  );
+}
+
+function ExploreButton({ onClick, visible }: { onClick: () => void, visible: boolean }) {
+  const [hovered, setHovered] = useState(false);
+  const groupRef = useRef<THREE.Group>(null);
+  
+  useFrame(() => {
+    if (groupRef.current) {
+      const targetScale = hovered ? 1.05 : 1.0;
+      groupRef.current.scale.setScalar(THREE.MathUtils.lerp(groupRef.current.scale.x, targetScale, 0.1));
+      groupRef.current.position.y = THREE.MathUtils.lerp(
+        groupRef.current.position.y,
+        -4.0 + Math.sin(Date.now() * 0.002) * 0.15,
+        0.1
+      );
+    }
+  });
+
+  if (!visible) return null;
+
+  return (
+    <group ref={groupRef} position={[0, -4.0, 0]}>
+      <mesh 
+        rotation={[0, 0, Math.PI / 2]} 
+        onPointerOver={() => { setHovered(true); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'default'; }}
+        onClick={() => { document.body.style.cursor = 'default'; onClick(); }}
+        castShadow
+      >
+        <capsuleGeometry args={[0.7, 3.8, 16, 32]} />
+        <MeshTransmissionMaterial 
+          transmission={0.9}
+          thickness={0.5}
+          roughness={0.1}
+          clearcoat={1}
+        />
+      </mesh>
+
+      <mesh rotation={[0, 0, Math.PI / 2]}>
+        <capsuleGeometry args={[0.72, 3.82, 16, 32]} />
+        <meshBasicMaterial 
+          color={hovered ? "#ffffff" : "#4a90e2"} 
+          wireframe 
+          transparent 
+          opacity={hovered ? 0.6 : 0.2} 
+        />
+      </mesh>
+      
+      <group position={[0, 0, 0.7]}>
+        <Center>
+          <Text3D font={FONT_URL} size={0.35} height={0.1} curveSegments={24}>
+            EXPLORE
+            <meshStandardMaterial 
+              color={hovered ? "#ffffff" : "#cccccc"} 
+              emissive={hovered ? "#ffffff" : "#4a90e2"} 
+              emissiveIntensity={hovered ? 1.5 : 0.8} 
+            />
+          </Text3D>
+        </Center>
+      </group>
+    </group>
+  );
+}
+
+function ThreeDExplosionIntro({ onExplore }: { onExplore: () => void }) {
+  const [isExploding, setIsExploding] = useState(false);
+  const [showExplore, setShowExplore] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowExplore(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleExploreClick = () => {
+    setIsExploding(true);
+    // 1초 뒤 암전 시작, 그 후 메인 씬으로 전환
     setTimeout(() => {
       onExplore();
-    }, 1000);
+    }, 1500);
   };
 
   return (
-    <>
-      <style>
-        {`@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');`}
-      </style>
-      <motion.div
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center cursor-pointer overflow-hidden"
-        style={{
-          backgroundColor: "#0a0a0a",
-          backgroundImage: `radial-gradient(circle at center, transparent 0%, #000 100%), url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`
-        }}
-        exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
-        onClick={handleNeonClick}
-      >
-        <AnimatePresence>
-          {!clicked && (
-            <motion.h1
-              variants={flickerVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="text-7xl md:text-[9rem] select-none"
-              style={{
-                fontFamily: "'Great Vibes', cursive",
-                lineHeight: 1.2,
-                color: "#ffe6f2"
-              }}
-            >
-              Welcome
-            </motion.h1>
-          )}
-        </AnimatePresence>
+    <motion.div
+      className="fixed inset-0 z-[100] bg-[#030303]"
+      exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
+    >
+      <Canvas camera={{ position: [0, 0, 18], fov: 45 }} dpr={[1, 2]} shadows>
+        <color attach="background" args={["#000000"]} />
+        <Environment preset="city" />
         
-        <AnimatePresence>
-          {!clicked && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.6 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: 2, duration: 1 }}
-              className="absolute bottom-10 text-xs tracking-widest text-white/50 uppercase"
-            >
-              Click anywhere to enter
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </>
+        {/* 극적인 로우앵글 긴 그림자 */}
+        <directionalLight 
+          position={[0, 2, 10]} 
+          intensity={2.5} 
+          color="#ffffff" 
+          castShadow 
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+        />
+        <pointLight position={[0, -5, -5]} intensity={1.5} color="#4a90e2" />
+        
+        <Sparkles count={60} size={4} speed={0.4} opacity={1} scale={15} color="#ffffff" />
+        
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} receiveShadow>
+          <planeGeometry args={[100, 100]} />
+          <shadowMaterial transparent opacity={0.7} />
+        </mesh>
+        
+        <InteractiveExplodingText isExploding={isExploding} />
+        <ExploreButton visible={showExplore && !isExploding} onClick={handleExploreClick} />
+        
+      </Canvas>
+
+      <AnimatePresence>
+        {isExploding && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.5 }}
+            className="absolute inset-0 bg-black z-50 pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -1599,7 +1765,7 @@ export default function ThreeDMoodApp() {
     <>
       <AnimatePresence>
         {!introCompleted && (
-          <NeonIntro key="intro" onExplore={() => setIntroCompleted(true)} />
+          <ThreeDExplosionIntro key="intro" onExplore={() => setIntroCompleted(true)} />
         )}
       </AnimatePresence>
 
