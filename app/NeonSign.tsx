@@ -47,17 +47,18 @@ function Spark({ xOffset, yDrop, delay, duration, size }: any) {
   );
 }
 
-// ─── SVG Wire Layer (z:1, behind text) ───────────────────────────────────────
-function WireLayer() {
+// ─── SVG Wire Layer (z:1, behind text, hidden when dark) ────────────────────
+function WireLayer({ isPowered }: { isPowered: boolean }) {
   return (
-    <svg
+    <motion.svg
       className="absolute inset-0 w-full h-full pointer-events-none"
       style={{ zIndex: 1 }}
       viewBox="0 0 1440 900"
       preserveAspectRatio="xMidYMid slice"
+      animate={{ opacity: isPowered ? 1 : 0 }}
+      transition={{ duration: 0.8 }}
     >
       <defs>
-        {/* Subtle highlight on top edge of tube to fake 3D roundness */}
         <linearGradient id="wire-grad-1" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%"   stopColor="#888" stopOpacity="1" />
           <stop offset="40%"  stopColor="#333" stopOpacity="1" />
@@ -65,55 +66,30 @@ function WireLayer() {
         </linearGradient>
       </defs>
 
-      {/* === Wire 1: from 'W' left-edge → upper-left ceiling === */}
-      {/* Shadow / thickness pass */}
-      <path
-        d="M 500 420  Q 380 300  280 80"
-        stroke="#111" strokeWidth="8" fill="none" strokeLinecap="round"
-      />
-      {/* Main tube */}
-      <path
-        d="M 500 420  Q 380 300  280 80"
-        stroke="url(#wire-grad-1)" strokeWidth="5" fill="none" strokeLinecap="round"
-      />
-      {/* Top highlight shine */}
-      <path
-        d="M 500 420  Q 380 300  280 80"
-        stroke="#aaaaaa" strokeWidth="1.2" fill="none" strokeLinecap="round"
-        strokeDasharray="4 8" opacity="0.5"
-      />
+      {/* Wire 1: 'W' → upper-left ceiling */}
+      <path d="M 500 420  Q 380 300  280 80" stroke="#111" strokeWidth="8" fill="none" strokeLinecap="round" />
+      <path d="M 500 420  Q 380 300  280 80" stroke="url(#wire-grad-1)" strokeWidth="5" fill="none" strokeLinecap="round" />
+      <path d="M 500 420  Q 380 300  280 80" stroke="#aaaaaa" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeDasharray="4 8" opacity="0.5" />
 
-      {/* === Wire 2: from 'e' right-edge → lower-right floor === */}
-      <path
-        d="M 940 470  Q 1060 620  1180 900"
-        stroke="#111" strokeWidth="8" fill="none" strokeLinecap="round"
-      />
-      <path
-        d="M 940 470  Q 1060 620  1180 900"
-        stroke="url(#wire-grad-1)" strokeWidth="5" fill="none" strokeLinecap="round"
-      />
-      <path
-        d="M 940 470  Q 1060 620  1180 900"
-        stroke="#aaaaaa" strokeWidth="1.2" fill="none" strokeLinecap="round"
-        strokeDasharray="4 8" opacity="0.5"
-      />
+      {/* Wire 2: 'e' → lower-right floor */}
+      <path d="M 940 470  Q 1060 620  1180 900" stroke="#111" strokeWidth="8" fill="none" strokeLinecap="round" />
+      <path d="M 940 470  Q 1060 620  1180 900" stroke="url(#wire-grad-1)" strokeWidth="5" fill="none" strokeLinecap="round" />
+      <path d="M 940 470  Q 1060 620  1180 900" stroke="#aaaaaa" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeDasharray="4 8" opacity="0.5" />
 
-      {/* === Metal Clips at connection points === */}
-      {/* Clip at W (500, 420) */}
+      {/* Metal Clips */}
       <g transform="translate(500, 420) rotate(-20)">
         <rect x="-7" y="-10" width="14" height="20" rx="3" fill="#c0c0c0" stroke="#555" strokeWidth="1" />
         <rect x="-4" y="-4"  width="8"  height="8"  rx="1" fill="#444"    stroke="#333" strokeWidth="0.5" />
         <circle cx="0" cy="-6" r="1.5" fill="#888" />
         <circle cx="0" cy=" 6" r="1.5" fill="#888" />
       </g>
-      {/* Clip at e (940, 470) */}
       <g transform="translate(940, 470) rotate(18)">
         <rect x="-7" y="-10" width="14" height="20" rx="3" fill="#c0c0c0" stroke="#555" strokeWidth="1" />
         <rect x="-4" y="-4"  width="8"  height="8"  rx="1" fill="#444"    stroke="#333" strokeWidth="0.5" />
         <circle cx="0" cy="-6" r="1.5" fill="#888" />
         <circle cx="0" cy=" 6" r="1.5" fill="#888" />
       </g>
-    </svg>
+    </motion.svg>
   );
 }
 
@@ -346,7 +322,7 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
           onClick={handleClick}
         >
           <style dangerouslySetInnerHTML={{ __html: `
-            @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
           ` }} />
 
           {/* ── Layer 0: Concrete Texture ──────────────────────────── */}
@@ -404,15 +380,15 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
             />
           </motion.div>
 
-          {/* ── Layer 1: SVG Wire (z:1, behind text) ─────────────────── */}
-          <WireLayer />
+          {/* ── Layer 1: SVG Wire (z:1, hidden when dark) ─────────────── */}
+          <WireLayer isPowered={isPowered} />
 
           {/* ── Layer 2: Neon Text (z:2) ──────────────────────────────── */}
           <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
             style={{ zIndex: 2 }}
           >
-            {/* White Core — always rendered, opacity driven by power */}
+            {/* Welcome – pink neon */}
             <motion.h1
               className="font-normal select-none"
               style={{
@@ -421,6 +397,7 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
                 lineHeight: 1.2,
                 transform: "rotate(-4deg)",
                 color: "#fff",
+                marginBottom: "0.25rem",
               }}
               animate={isPowered ? {
                 opacity: opacities,
@@ -429,14 +406,34 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
                 opacity: 0,
                 textShadow: "none",
               }}
-              transition={isPowered ? {
-                duration: 0.8,
-                times,
-                ease: "linear",
-              } : { duration: 0.1 }}
+              transition={isPowered ? { duration: 0.8, times, ease: "linear" } : { duration: 0.1 }}
             >
               Welcome
             </motion.h1>
+
+            {/* made by daeeon – cyan neon */}
+            <motion.p
+              className="font-bold select-none"
+              style={{
+                fontFamily: "'Dancing Script', cursive",
+                fontSize: "clamp(1.4rem, 3vw, 2.5rem)",
+                color: "#fff",
+                transform: "rotate(-4deg) translateX(30px)",
+              }}
+              animate={isPowered ? {
+                opacity: opacities,
+                textShadow: opacities.map(o => o >= 1
+                  ? `0 0 5px #fff, 0 0 10px #fff, 0 0 20px #00d4ff, 0 0 40px #00d4ff, 0 0 80px #00d4ff, 2px 2px 0px rgba(0,0,0,0.5)`
+                  : `${(Math.random()-0.5)*8}px ${(Math.random()-0.5)*8}px 6px rgba(0,212,255,0.5), 2px 2px 0px rgba(0,0,0,0.5)`
+                ),
+              } : {
+                opacity: 0,
+                textShadow: "none",
+              }}
+              transition={isPowered ? { duration: 0.8, times, ease: "linear" } : { duration: 0.1 }}
+            >
+              made by daeeon
+            </motion.p>
           </div>
 
           {/* ── Layer 3: Spark Particles (z:3) ───────────────────────── */}
