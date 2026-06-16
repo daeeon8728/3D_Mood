@@ -13,7 +13,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Text3D, Center } from '@react-three/drei';
-import NeonIntro from './NeonIntro';
+import NeonSign from './NeonSign';
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 
@@ -1508,7 +1508,7 @@ export default function ThreeDMoodApp() {
     <>
       <AnimatePresence>
         {!introCompleted && (
-          <NeonIntro key="intro" onExplore={() => setIntroCompleted(true)} />
+          <NeonSign key="intro" onExplore={() => setIntroCompleted(true)} />
         )}
       </AnimatePresence>
 
