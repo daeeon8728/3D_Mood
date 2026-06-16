@@ -3,18 +3,16 @@
 import React, { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
-// Helper to generate spark data so it's stable across renders
+// Helper to generate spark data
 const generateSparks = (count: number) => {
   return Array.from({ length: count }).map((_, i) => ({
     id: i,
-    // Spreading slightly from the end of the letter 'e'
     xOffset: (Math.random() - 0.5) * 40, 
-    // Gravity effect: drops down significantly
     yDrop: 100 + Math.random() * 150, 
     delay: Math.random() * 2,
     duration: 0.6 + Math.random() * 0.8,
     size: Math.random() * 3 + 2,
-    color: Math.random() > 0.5 ? "#FF4500" : "#FF8C00", // Orange/Red
+    color: "#FF4500", // Fixed purely to striking orange/red
   }));
 };
 
@@ -28,15 +26,14 @@ function Spark({ xOffset, yDrop, delay, duration, size, color }: any) {
         backgroundColor: "#fff",
         boxShadow: `0 0 6px 2px ${color}`,
         mixBlendMode: "screen",
-        // Positioned roughly at the end of the 'Welcome' cursive tail
         left: "calc(50% + 180px)",
         top: "calc(50% + 10px)",
-        zIndex: 5, // Above text
+        zIndex: 5, 
       }}
       initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
       animate={{
         x: [0, xOffset * 0.5, xOffset],
-        y: [0, yDrop * 0.2, yDrop], // Accelerates downwards (gravity)
+        y: [0, yDrop * 0.2, yDrop], 
         opacity: [0, 1, 0],
         scale: [0, 1.2, 0],
       }}
@@ -45,33 +42,30 @@ function Spark({ xOffset, yDrop, delay, duration, size, color }: any) {
         delay: delay,
         repeat: Infinity,
         repeatDelay: Math.random() * 1.5 + 0.5,
-        ease: "easeIn", // Gravity accelerates
+        ease: "easeIn",
       }}
     />
   );
 }
 
-// Draw realistic-looking wires connecting the neon tubes
+// Draw wires with faint blue emissive outline instead of shadow
 function BackgroundWires() {
   return (
     <svg 
       className="absolute inset-0 w-full h-full pointer-events-none" 
-      style={{ zIndex: 1, opacity: 0.8 }}
+      style={{ zIndex: 1, opacity: 0.9 }}
       preserveAspectRatio="none"
     >
       <defs>
-        <filter id="drop-shadow">
-          <feDropShadow dx="2" dy="5" stdDeviation="4" floodColor="#000" floodOpacity="0.8"/>
+        <filter id="wire-glow">
+          {/* Faint blue emissive glow on the wire edges */}
+          <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#1A1A3F" floodOpacity="1"/>
         </filter>
       </defs>
-      <g filter="url(#drop-shadow)" stroke="#0a0a0a" strokeWidth="6" fill="none" strokeLinecap="round">
-        {/* Main power line coming from top left ceiling */}
+      <g filter="url(#wire-glow)" stroke="#050505" strokeWidth="6" fill="none" strokeLinecap="round">
         <path d="M 30% -10% Q 35% 30% 45% 48%" />
-        {/* Wire looping behind 'Welcome' */}
         <path d="M 45% 48% Q 50% 55% 55% 52%" strokeWidth="4" />
-        {/* Wire connecting to 'made by daeeon' */}
         <path d="M 55% 52% Q 58% 65% 55% 62%" strokeWidth="3" />
-        {/* Wire exiting to the right floor */}
         <path d="M 55% 62% Q 65% 70% 80% 110%" strokeWidth="5" />
       </g>
     </svg>
@@ -101,17 +95,8 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
 
   const offsetX = (mousePos.x - 0.5) * 30;
   const offsetY = (mousePos.y - 0.5) * 30;
-  
-  const neonShadowPink = `
-    0 0 2px #fff,
-    0 0 4px #fff,
-    0 0 10px #ff2a85,
-    0 0 20px #ff2a85,
-    0 0 40px #ff2a85,
-    ${offsetX}px ${offsetY}px 80px #ff2a85,
-    ${offsetX * 1.5}px ${offsetY * 1.5}px 120px #ff2a85
-  `;
 
+  // Blue sub-text shadow
   const neonShadowBlue = `
     0 0 1px #fff,
     0 0 3px #fff,
@@ -143,7 +128,21 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     animate: {
       opacity: opacities,
       color: opacities.map((o) => (o === 1 ? "#fff" : "#111")),
-      textShadow: opacities.map((o) => (o === 1 ? neonShadowPink : "none")),
+      // Include random voltage jitter directly into the textShadow when it's ON
+      textShadow: opacities.map((o) => {
+        if (o !== 1) return "none";
+        const jitterX = (Math.random() - 0.5) * 6;
+        const jitterY = (Math.random() - 0.5) * 6;
+        return `
+          0 0 2px #fff,
+          0 0 4px #fff,
+          ${jitterX}px ${jitterY}px 10px #ff2a85,
+          ${jitterX * 1.5}px ${jitterY * 1.5}px 20px #ff2a85,
+          ${jitterX * 2}px ${jitterY * 2}px 40px #ff2a85,
+          ${offsetX + jitterX}px ${offsetY + jitterY}px 80px #ff2a85,
+          ${(offsetX + jitterX) * 1.5}px ${(offsetY + jitterY) * 1.5}px 120px #ff2a85
+        `;
+      }),
       transition: {
         duration: 3,
         times: times,
@@ -178,11 +177,23 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
           `}} />
 
-          {/* Layer 0: Concrete Texture (z-index: 0 implies bottom within stacking context) */}
+          {/* Layer 0: Concrete Texture */}
           <div className="absolute inset-0 opacity-[0.25] pointer-events-none mix-blend-overlay" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
             zIndex: 0,
           }}></div>
+
+          {/* Layer 1.5: Wall Light Map (Glow interacting with the physical wall) */}
+          <motion.div
+            animate={{ opacity: opacities }}
+            transition={{ duration: 3, times: times, ease: "linear" }}
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] pointer-events-none blur-[80px]"
+            style={{
+              background: "radial-gradient(ellipse at center, rgba(255,42,133,0.18) 0%, rgba(0,212,255,0.06) 50%, transparent 70%)",
+              zIndex: 1,
+              mixBlendMode: "screen",
+            }}
+          />
 
           {/* Layer 1: Background Wiring */}
           <BackgroundWires />
@@ -223,7 +234,6 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
                 className="text-7xl md:text-9xl lg:text-[11rem] font-normal text-white mb-2"
                 style={{
                   fontFamily: "'Pinyon Script', cursive",
-                  textShadow: neonShadowPink,
                   lineHeight: "1.2",
                   transform: "rotate(-4deg)"
                 }}
