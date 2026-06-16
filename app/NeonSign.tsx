@@ -94,8 +94,8 @@ function WireLayer({ isPowered }: { isPowered: boolean }) {
 }
 
 // ─── Mechanical Lever ─────────────────────────────────────────────────────────
-const SLOT_H   = 200; // total slot travel in px
-const SNAP_AT  = SLOT_H * 0.8; // 80% threshold
+const SLOT_H  = 133; // 2/3 of original 200px
+const SNAP_AT = SLOT_H * 0.8;
 
 interface LeverProps {
   onSnap: () => void;
@@ -131,7 +131,7 @@ function MechanicalLever({ onSnap }: LeverProps) {
   return (
     <div
       className="relative flex flex-col items-center"
-      style={{ width: 60, height: SLOT_H + 60 }}
+      style={{ width: 40, height: SLOT_H + 40 }}
     >
       {/* Labels */}
       <span className="text-[9px] font-bold tracking-widest text-zinc-500 uppercase mb-1">OFF</span>
@@ -140,17 +140,17 @@ function MechanicalLever({ onSnap }: LeverProps) {
       <div
         className="relative flex justify-center"
         style={{
-          width: 16,
+          width: 11,
           height: SLOT_H,
           background: "linear-gradient(90deg, #1a1a1a 0%, #2d2d2d 30%, #1a1a1a 100%)",
-          borderRadius: 8,
-          boxShadow: "inset 0 2px 8px rgba(0,0,0,0.9), inset 0 0 0 1px #444",
+          borderRadius: 6,
+          boxShadow: "inset 0 2px 6px rgba(0,0,0,0.9), inset 0 0 0 1px #444",
         }}
       >
         {/* Inner slot rail */}
         <div
-          className="absolute top-2 bottom-2 w-[3px] rounded-full"
-          style={{ background: "linear-gradient(180deg, #555 0%, #222 100%)" }}
+          className="absolute top-2 bottom-2 rounded-full"
+          style={{ width: 2, background: "linear-gradient(180deg, #555 0%, #222 100%)" }}
         />
 
         {/* Lever handle */}
@@ -168,10 +168,10 @@ function MechanicalLever({ onSnap }: LeverProps) {
           <div
             className="relative cursor-grab active:cursor-grabbing select-none"
             style={{
-              width: 40,
-              height: 40,
+              width: 27,
+              height: 27,
               marginLeft: 0,
-              borderRadius: 8,
+              borderRadius: 6,
               background: snapped
                 ? "linear-gradient(135deg, #d4af37 0%, #8B6914 60%, #c9a227 100%)"
                 : "linear-gradient(135deg, #d0d0d0 0%, #808080 60%, #b0b0b0 100%)",
@@ -185,14 +185,14 @@ function MechanicalLever({ onSnap }: LeverProps) {
             }}
           >
             {/* Grip ridges */}
-            {[0, 1, 2].map(i => (
+            {[0, 1].map(i => (
               <div
                 key={i}
                 style={{
                   position: "absolute",
-                  left: 6, right: 6,
-                  top: 8 + i * 9,
-                  height: 2,
+                  left: 4, right: 4,
+                  top: 6 + i * 8,
+                  height: 1.5,
                   borderRadius: 1,
                   background: "rgba(0,0,0,0.25)",
                   boxShadow: "0 1px 0 rgba(255,255,255,0.15)",
