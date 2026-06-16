@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
 // Helper to generate spark data
@@ -48,27 +48,29 @@ function Spark({ xOffset, yDrop, delay, duration, size, color }: any) {
   );
 }
 
-// Draw wires with faint blue emissive outline instead of shadow
+// Layer 1: Background Wires with junction dots
 function BackgroundWires() {
   return (
     <svg 
       className="absolute inset-0 w-full h-full pointer-events-none" 
-      style={{ zIndex: 1, opacity: 0.9 }}
+      style={{ 
+        zIndex: 1, 
+        filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.2))' 
+      }}
       preserveAspectRatio="none"
     >
-      {/* Base Wire (Dark core for silhouette) */}
-      <g stroke="#050505" strokeWidth="6" fill="none" strokeLinecap="round">
+      {/* Base Wire */}
+      <g stroke="#1a1a1a" strokeWidth="2" fill="none" strokeLinecap="round">
         <path d="M 30% -10% Q 35% 30% 45% 48%" />
-        <path d="M 45% 48% Q 50% 55% 55% 52%" strokeWidth="4" />
-        <path d="M 55% 52% Q 58% 65% 55% 62%" strokeWidth="3" />
-        <path d="M 55% 62% Q 65% 70% 80% 110%" strokeWidth="5" />
+        <path d="M 45% 48% Q 50% 55% 55% 52%" />
+        <path d="M 55% 52% Q 58% 65% 55% 62%" />
+        <path d="M 55% 62% Q 65% 70% 80% 110%" />
       </g>
-      {/* Emissive surface on the wire (no drop shadow) */}
-      <g stroke="#1A1A3F" strokeWidth="6" fill="none" strokeLinecap="round" style={{ opacity: 0.1 }}>
-        <path d="M 30% -10% Q 35% 30% 45% 48%" />
-        <path d="M 45% 48% Q 50% 55% 55% 52%" strokeWidth="4" />
-        <path d="M 55% 52% Q 58% 65% 55% 62%" strokeWidth="3" />
-        <path d="M 55% 62% Q 65% 70% 80% 110%" strokeWidth="5" />
+      {/* Glowing junction dots where wire meets the text layer */}
+      <g fill="#fff" style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.8))' }}>
+        <circle cx="45%" cy="48%" r="3" />
+        <circle cx="55%" cy="52%" r="2" />
+        <circle cx="55%" cy="62%" r="3" />
       </g>
     </svg>
   );
@@ -76,16 +78,6 @@ function BackgroundWires() {
 
 export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
   const [isFadingOut, setIsFadingOut] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
-  
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    const { left, top, width, height } = containerRef.current.getBoundingClientRect();
-    const x = (e.clientX - left) / width;
-    const y = (e.clientY - top) / height;
-    setMousePos({ x, y });
-  };
 
   const handleClick = () => {
     if (isFadingOut) return;
@@ -94,19 +86,6 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
       onExplore();
     }, 1200);
   };
-
-  const offsetX = (mousePos.x - 0.5) * 30;
-  const offsetY = (mousePos.y - 0.5) * 30;
-
-  // Blue sub-text shadow
-  const neonShadowBlue = `
-    0 0 1px #fff,
-    0 0 3px #fff,
-    0 0 8px #00d4ff,
-    0 0 15px #00d4ff,
-    0 0 30px #00d4ff,
-    ${offsetX * 0.5}px ${offsetY * 0.5}px 60px #00d4ff
-  `;
 
   const { opacities, times } = useMemo(() => {
     const steps = 30;
@@ -125,41 +104,53 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     return { opacities: op, times: tm };
   }, []);
 
-  const erraticFlicker: Variants = {
-    initial: { opacity: 0.05, textShadow: "none", color: "#111" },
+  const erraticGlow: Variants = {
+    initial: { opacity: 0.05, textShadow: "none" },
     animate: {
       opacity: opacities,
-      color: opacities.map((o) => (o === 1 ? "#fff" : "#111")),
-      // Include random voltage jitter directly into the textShadow
       textShadow: opacities.map((o) => {
         const jitterX = (Math.random() - 0.5) * 8;
         const jitterY = (Math.random() - 0.5) * 8;
         if (o !== 1) {
-          // When flickering/off, keep a faint, jittery pink outline to show unstable voltage
           return `${jitterX}px ${jitterY}px 5px rgba(255,42,133,0.5)`;
         }
         return `
-          0 0 2px #fff,
-          0 0 4px #fff,
-          ${jitterX}px ${jitterY}px 10px #ff2a85,
+          0 0 10px #ff2a85,
           ${jitterX * 1.5}px ${jitterY * 1.5}px 20px #ff2a85,
           ${jitterX * 2}px ${jitterY * 2}px 40px #ff2a85,
-          ${offsetX + jitterX}px ${offsetY + jitterY}px 80px #ff2a85,
-          ${(offsetX + jitterX) * 1.5}px ${(offsetY + jitterY) * 1.5}px 120px #ff2a85
+          ${jitterX}px ${jitterY}px 80px #ff2a85,
+          ${jitterX * 1.5}px ${jitterY * 1.5}px 120px #ff2a85
         `;
       }),
-      transition: {
-        duration: 3,
-        times: times,
-        ease: "linear",
-      },
+      transition: { duration: 3, times: times, ease: "linear" },
     },
-    exit: { 
-      opacity: 0,
-      scale: 1.05,
-      filter: "blur(20px)",
-      transition: { duration: 1.0, ease: "easeOut" } 
-    }
+    exit: { opacity: 0, scale: 1.05, filter: "blur(20px)", transition: { duration: 1.0, ease: "easeOut" } }
+  };
+
+  const subtextGlow = `
+    0 0 8px #00d4ff,
+    0 0 15px #00d4ff,
+    0 0 30px #00d4ff,
+    0 0 60px #00d4ff
+  `;
+
+  const erraticSubtextGlow: Variants = {
+    initial: { opacity: 0.05, textShadow: "none" },
+    animate: {
+      opacity: opacities,
+      textShadow: opacities.map((o) => (o === 1 ? subtextGlow : "none")),
+      transition: { duration: 3, times: times, ease: "linear" },
+    },
+  };
+
+  const erraticCore: Variants = {
+    initial: { opacity: 0.05, color: "#111" },
+    animate: {
+      opacity: opacities,
+      color: opacities.map((o) => (o === 1 ? "#fff" : "#111")),
+      transition: { duration: 3, times: times, ease: "linear" },
+    },
+    exit: { opacity: 0, scale: 1.05, transition: { duration: 1.0, ease: "easeOut" } }
   };
 
   const sparks = useMemo(() => generateSparks(20), []);
@@ -168,21 +159,32 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     <AnimatePresence>
       {!isFadingOut && (
         <motion.div
-          ref={containerRef}
-          onMouseMove={handleMouseMove}
           onClick={handleClick}
           exit="exit"
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center cursor-pointer overflow-hidden"
-          style={{
-            backgroundColor: "#050505",
-            backgroundImage: `radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%)`,
-          }}
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center cursor-pointer overflow-hidden bg-[#050505]"
         >
           <style dangerouslySetInnerHTML={{__html: `
             @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
           `}} />
 
-          {/* Layer 0: Wall Light Map (Glow under the concrete texture) */}
+          {/* Layer 0: Concrete Texture Interacting with Neon */}
+          <motion.div 
+            className="absolute inset-0 pointer-events-none"
+            animate={{ 
+              backgroundColor: opacities.map(o => o === 1 ? 'rgba(50,20,30,0.4)' : 'rgba(10,10,10,0.9)') 
+            }}
+            transition={{ duration: 3, times: times, ease: "linear" }}
+            style={{
+              backgroundImage: `url('/콘크리트_텍스처.jpg')`,
+              backgroundBlendMode: 'overlay',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'contrast(120%) brightness(80%)',
+              zIndex: 0,
+            }}
+          />
+
+          {/* Layer 0.5: Wall Light Map */}
           <motion.div
             animate={{ opacity: opacities }}
             transition={{ duration: 3, times: times, ease: "linear" }}
@@ -194,49 +196,33 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             }}
           />
 
-          {/* Layer 1: Concrete Texture (Overlays on top of the light map) */}
-          <div className="absolute inset-0 opacity-[0.3] pointer-events-none mix-blend-overlay" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-            zIndex: 1,
-          }}></div>
-
           {/* Layer 1: Background Wiring */}
           <BackgroundWires />
 
-          {/* Wrapper to sync sparks with flicker opacity */}
+          {/* Sparks Wrapper */}
           <motion.div
              animate={{ opacity: opacities }}
              transition={{ duration: 3, times: times, ease: "linear" }}
              className="absolute inset-0 pointer-events-none z-[5]"
           >
-            {/* Layer 3: Particles (Orange/Red Sparks falling from the 'e' tail) */}
             {sparks.map((spark) => (
               <Spark key={spark.id} {...spark} />
             ))}
           </motion.div>
 
-          {/* Layer 2: Neon Sign Text */}
-          <motion.div
-            variants={erraticFlicker}
-            initial="initial"
-            animate="animate"
-            className="relative z-[2] flex flex-col items-center"
-            style={{ mixBlendMode: "screen" }}
-          >
+          {/* Layer 2: Neon Sign Container */}
+          <div className="relative flex flex-col items-center" style={{ width: 800, height: 400 }}>
+            
+            {/* Layer 2.1: White Core */}
             <motion.div
-              animate={{ opacity: [1, 0.7, 1, 0.4, 1, 0.9, 1, 1, 1] }}
-              transition={{
-                delay: 3,
-                duration: 5,
-                repeat: Infinity,
-                repeatType: "mirror",
-                ease: "linear",
-                times: [0, 0.1, 0.2, 0.25, 0.3, 0.5, 0.6, 0.8, 1]
-              }}
-              className="flex flex-col items-center relative"
+              variants={erraticCore}
+              initial="initial"
+              animate="animate"
+              className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+              style={{ zIndex: 2 }}
             >
               <h1 
-                className="text-7xl md:text-9xl lg:text-[11rem] font-normal text-white mb-2"
+                className="text-7xl md:text-9xl lg:text-[11rem] font-normal mb-2"
                 style={{
                   fontFamily: "'Pinyon Script', cursive",
                   lineHeight: "1.2",
@@ -247,23 +233,56 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
               </h1>
               
               <p
-                className="text-2xl md:text-4xl text-white font-bold"
+                className="text-2xl md:text-4xl font-bold"
                 style={{
                   fontFamily: "'Dancing Script', cursive",
-                  textShadow: neonShadowBlue,
                   transform: "rotate(-4deg) translateX(30px)"
                 }}
               >
                 made by daeeon
               </p>
             </motion.div>
-          </motion.div>
+
+            {/* Layer 2.2: Outer Glow */}
+            <motion.div
+              className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+              style={{ zIndex: 3, mixBlendMode: "screen" }}
+            >
+              <motion.h1 
+                variants={erraticGlow}
+                initial="initial"
+                animate="animate"
+                className="text-7xl md:text-9xl lg:text-[11rem] font-normal text-transparent mb-2"
+                style={{
+                  fontFamily: "'Pinyon Script', cursive",
+                  lineHeight: "1.2",
+                  transform: "rotate(-4deg)"
+                }}
+              >
+                Welcome
+              </motion.h1>
+              
+              <motion.p
+                variants={erraticSubtextGlow}
+                initial="initial"
+                animate="animate"
+                className="text-2xl md:text-4xl text-transparent font-bold"
+                style={{
+                  fontFamily: "'Dancing Script', cursive",
+                  transform: "rotate(-4deg) translateX(30px)"
+                }}
+              >
+                made by daeeon
+              </motion.p>
+            </motion.div>
+
+          </div>
           
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 0.5, 0] }}
             transition={{ duration: 3, repeat: Infinity, delay: 3.5 }}
-            className="absolute bottom-12 text-zinc-600 tracking-[0.4em] text-xs font-light z-10 uppercase font-sans"
+            className="absolute bottom-12 text-zinc-400 tracking-[0.4em] text-xs font-light z-10 uppercase font-sans mix-blend-screen"
           >
             Click Anywhere to Enter
           </motion.div>
