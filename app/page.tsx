@@ -1430,31 +1430,39 @@ function InteractiveText() {
   const { mouse } = useThree();
   const letters = "WELCOME".split("");
 
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const smoothMouseX = useSpring(mouseX, { stiffness: 120, damping: 15 });
+  const smoothMouseY = useSpring(mouseY, { stiffness: 120, damping: 15 });
+
   useFrame(() => {
     if (!groupRef.current) return;
-    // 마우스 거리에 따른 팽창 폭 증가
-    const expansion = Math.abs(mouse.x) * 2.5;
+    
+    // update framer-motion values
+    mouseX.set(mouse.x);
+    mouseY.set(mouse.y);
+    
+    const curX = smoothMouseX.get();
+    const curY = smoothMouseY.get();
+
+    const expansion = Math.abs(curX) * 2.5;
     
     groupRef.current.children.forEach((child, i) => {
       const offsetFromCenter = i - 3;
       
-      // 1. 넓이 조절
       const targetX = offsetFromCenter * (1.6 + expansion);
-      child.position.x = THREE.MathUtils.lerp(child.position.x, targetX, 0.08);
+      child.position.x = targetX;
       
-      // 2. Y, Z 유기적 움직임
       const targetY = Math.sin(Date.now() * 0.001 + i) * 0.15;
-      child.position.y = THREE.MathUtils.lerp(child.position.y, targetY, 0.08);
+      child.position.y = targetY;
       
-      // 3. 중심축 기준 미세 회전 (조형미)
-      // 마우스가 멀어질수록 벌어지면서 바깥을 향해 회전함
-      const targetRotY = offsetFromCenter * mouse.x * 0.2;
-      const targetRotX = mouse.y * 0.2;
-      const targetRotZ = offsetFromCenter * mouse.x * -0.05;
+      const targetRotY = offsetFromCenter * curX * 0.2;
+      const targetRotX = curY * 0.2;
+      const targetRotZ = offsetFromCenter * curX * -0.05;
       
-      child.rotation.x = THREE.MathUtils.lerp(child.rotation.x, targetRotX, 0.08);
-      child.rotation.y = THREE.MathUtils.lerp(child.rotation.y, targetRotY, 0.08);
-      child.rotation.z = THREE.MathUtils.lerp(child.rotation.z, targetRotZ, 0.08);
+      child.rotation.x = targetRotX;
+      child.rotation.y = targetRotY;
+      child.rotation.z = targetRotZ;
     });
   });
 
@@ -1466,11 +1474,11 @@ function InteractiveText() {
             <Text3D
               font={FONT_URL}
               size={2.2}
-              height={2.0}          // 아주 두꺼운 매스감
+              height={1.0}
               curveSegments={32}
-              bevelEnabled
-              bevelThickness={0.15} // 확실한 옆면 반사각
-              bevelSize={0.06}
+              bevelEnabled={true}
+              bevelThickness={0.05}
+              bevelSize={0.03}
               bevelOffset={0}
               bevelSegments={10}
               castShadow
@@ -1478,9 +1486,11 @@ function InteractiveText() {
             >
               {char}
               <meshPhysicalMaterial 
-                color="#e5e5e5"
-                metalness={0.95} 
-                roughness={0.1} 
+                color="#ffffff"
+                transmission={0.9}
+                thickness={0.5}
+                roughness={0.05}
+                metalness={0.1}
                 clearcoat={1.0}
                 clearcoatRoughness={0.1}
                 envMapIntensity={2.5}
@@ -1632,17 +1642,27 @@ function ThreeDIntro({ onExplore }: { onExplore: () => void }) {
     >
       <Canvas camera={{ position: [0, 0, 16], fov: 45 }} dpr={[1, 2]} shadows>
         <color attach="background" args={["#000000"]} />
-        <Environment preset="city" />
+        <Environment preset="studio" />
         
-        {/* 극적인 볼륨감을 위한 조명 세팅 */}
-        {/* 1. 위에서 내리꽂는 주광 (White) */}
-        <pointLight position={[0, 10, 5]} intensity={800} color="#ffffff" castShadow />
+        {/* 긴 그림자를 위한 방향광 */}
+        <directionalLight 
+          position={[0, 1, 5]} 
+          intensity={2.5} 
+          color="#ffffff" 
+          castShadow 
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+        />
         
-        {/* 2. 아래에서 은은하게 올려치는 반사광 (Cool Blue) */}
+        {/* 은은한 엑센트 조명 유지 */}
         <pointLight position={[0, -10, -5]} intensity={500} color="#4a90e2" />
-        
-        {/* 3. 우측면 엑센트 조명 (Pink/Magenta 계열로 포인트) */}
         <pointLight position={[10, 0, 5]} intensity={400} color="#ff2a85" />
+        
+        {/* 긴 그림자를 받는 바닥 (shadowMaterial 사용으로 다른 오브젝트를 가리지 않음) */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]} receiveShadow>
+          <planeGeometry args={[100, 100]} />
+          <shadowMaterial transparent opacity={0.6} />
+        </mesh>
         
         <InteractiveText />
         <ExploreButton visible={showExplore} onClick={handleExploreClick} />
