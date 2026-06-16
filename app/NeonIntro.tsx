@@ -181,36 +181,47 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             aria-label="Turn on neon sign"
             onClick={handleSwitchClick}
             disabled={isVisible || isGlitching || isFadingOut}
-            className="absolute right-[14vw] top-[28vh] z-10 h-[92px] w-[48px] cursor-pointer rounded-full border border-white/15 bg-zinc-950/85 p-[7px] shadow-2xl disabled:cursor-default"
+            className="absolute right-[12vw] top-[28vh] z-10 h-[112px] w-[70px] cursor-pointer rounded-[12px] border border-white/[0.08] bg-[#151515] p-[10px] disabled:cursor-default"
             animate={{
-              boxShadow: [
-                "0 0 10px rgba(255,255,255,0.18), 0 0 24px rgba(255,255,255,0.08)",
-                "0 0 18px rgba(255,255,255,0.38), 0 0 38px rgba(255,255,255,0.16)",
-                "0 0 10px rgba(255,255,255,0.18), 0 0 24px rgba(255,255,255,0.08)",
-              ],
+              boxShadow: isVisible
+                ? "inset 0 2px 8px rgba(0,0,0,0.82), inset 0 -1px 0 rgba(255,255,255,0.06)"
+                : [
+                    "0 0 18px rgba(185,150,255,0.4), inset 0 2px 8px rgba(0,0,0,0.82), inset 0 -1px 0 rgba(255,255,255,0.06)",
+                    "0 0 30px rgba(185,150,255,0.7), inset 0 2px 8px rgba(0,0,0,0.82), inset 0 -1px 0 rgba(255,255,255,0.06)",
+                    "0 0 18px rgba(185,150,255,0.4), inset 0 2px 8px rgba(0,0,0,0.82), inset 0 -1px 0 rgba(255,255,255,0.06)",
+                  ],
             }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 3.2, repeat: isVisible ? 0 : Infinity, ease: "easeInOut" }}
+            style={{
+              backgroundImage: "url('/%EC%BD%98%ED%81%AC%EB%A6%AC%ED%8A%B8_%ED%85%8D%EC%8A%A4%EC%B2%98.jpg'), linear-gradient(145deg, #242424, #0f0f0f)",
+              backgroundBlendMode: "overlay",
+              backgroundSize: "cover",
+            }}
           >
             <motion.span
-              className="absolute left-1/2 top-[8px] z-[2] h-[30px] w-[30px] -translate-x-1/2 rounded-full border border-white/20 bg-zinc-800"
+              className="absolute left-1/2 top-[15px] z-[2] h-[58px] w-[22px] -translate-x-1/2 rounded-[7px] border border-white/20"
               animate={{
-                y: isVisible ? 46 : 0,
-                scale: isGlitching ? [1, 0.86, 1.08, 0.92, 1] : 1,
-                backgroundColor: isVisible ? "#f8f8f8" : "#27272a",
+                y: isVisible ? 24 : 0,
+                rotate: isVisible ? -13 : 13,
+                scale: isGlitching ? [1, 0.94, 1.03, 0.98, 1] : 1,
                 boxShadow: isVisible
-                  ? "inset 0 5px 12px rgba(0,0,0,0.18), 0 0 18px rgba(255,255,255,0.62)"
-                  : "inset 0 -5px 12px rgba(0,0,0,0.7), 0 0 12px rgba(255,255,255,0.28)",
+                  ? "inset 5px 0 8px rgba(255,255,255,0.42), inset -7px 0 10px rgba(0,0,0,0.62), 0 3px 5px rgba(0,0,0,0.65)"
+                  : "inset 5px 0 8px rgba(255,255,255,0.35), inset -7px 0 10px rgba(0,0,0,0.72), 0 5px 8px rgba(0,0,0,0.72)",
               }}
-              transition={isGlitching ? { duration: 0.3, times: [0, 0.22, 0.45, 0.7, 1] } : { type: "spring", stiffness: 760, damping: 22 }}
+              transition={isGlitching ? { duration: 0.3, times: [0, 0.22, 0.45, 0.7, 1] } : { type: "spring", stiffness: 620, damping: 18 }}
+              style={{
+                background: "linear-gradient(90deg, #3a3a3a 0%, #b9b9b9 22%, #f4f4f4 45%, #7b7b7b 72%, #242424 100%)",
+                transformOrigin: "50% 50%",
+              }}
             />
-            <span className="absolute left-1/2 top-1/2 z-[1] h-[62px] w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/10" />
+            <span className="absolute left-1/2 top-1/2 z-[1] h-[82px] w-[28px] -translate-x-1/2 -translate-y-1/2 rounded-[8px] border border-black/70 bg-black/45 shadow-[inset_0_2px_8px_rgba(0,0,0,0.9),inset_0_-1px_0_rgba(255,255,255,0.06)]" />
           </motion.button>
 
           <motion.div
             className="relative flex flex-col items-center"
             animate={{
-              scale: isTransitioning ? [1, 1.035, 1.14] : 1,
-              filter: isTransitioning ? ["blur(0px)", "blur(0px)", "blur(12px)"] : "blur(0px)",
+              scale: isTransitioning ? [1, 1.012, 1.035] : 1,
+              filter: isTransitioning ? ["blur(0px)", "blur(0px)", "blur(4px)"] : "blur(0px)",
             }}
             transition={{ duration: 1.25, ease: [0.22, 1, 0.36, 1] }}
             style={{ width: 800, height: 400, zIndex: 2 }}
@@ -281,10 +292,10 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
 
           <motion.div
             className="absolute inset-0 pointer-events-none"
-            animate={isTransitioning ? { opacity: [0, 1, 0.25, 0.85] } : { opacity: 0 }}
+            animate={isTransitioning ? { opacity: [0, 0.38, 0.08, 0.24] } : { opacity: 0 }}
             transition={{ duration: 1.35, times: [0, 0.22, 0.55, 1], ease: "easeInOut" }}
             style={{
-              background: "radial-gradient(circle at center, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.42) 18%, rgba(255,42,133,0.16) 36%, transparent 62%)",
+              background: "radial-gradient(circle at center, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.16) 18%, rgba(255,42,133,0.08) 36%, transparent 62%)",
               mixBlendMode: "screen",
               zIndex: 20,
             }}
@@ -292,18 +303,18 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
 
           <motion.div
             className="absolute left-1/2 top-1/2 pointer-events-none h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70"
-            animate={isTransitioning ? { scale: [0.2, 3.4, 18], opacity: [0, 1, 0] } : { scale: 0.2, opacity: 0 }}
+            animate={isTransitioning ? { scale: [0.2, 2.6, 8], opacity: [0, 0.58, 0] } : { scale: 0.2, opacity: 0 }}
             transition={{ duration: 1.25, times: [0, 0.32, 1], ease: [0.16, 1, 0.3, 1] }}
-            style={{ boxShadow: "0 0 40px rgba(255,255,255,0.75), inset 0 0 24px rgba(255,255,255,0.35)", zIndex: 21 }}
+            style={{ boxShadow: "0 0 28px rgba(255,255,255,0.42), inset 0 0 18px rgba(255,255,255,0.22)", zIndex: 21 }}
           />
 
           <motion.div
             className="absolute inset-y-0 pointer-events-none w-[38vw]"
-            animate={isTransitioning ? { x: ["-55vw", "120vw"], opacity: [0, 1, 0] } : { x: "-55vw", opacity: 0 }}
-            transition={{ delay: 0.25, duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            animate={isTransitioning ? { x: ["-45vw", "110vw"], opacity: [0, 0.42, 0] } : { x: "-45vw", opacity: 0 }}
+            transition={{ delay: 0.28, duration: 1.05, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 18%, rgba(255,255,255,0.96) 50%, rgba(255,255,255,0.08) 82%, transparent 100%)",
-              filter: "blur(6px)",
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 18%, rgba(255,255,255,0.38) 50%, rgba(255,255,255,0.04) 82%, transparent 100%)",
+              filter: "blur(10px)",
               mixBlendMode: "screen",
               zIndex: 22,
             }}
@@ -311,7 +322,7 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
 
           <motion.div
             className="absolute inset-0 pointer-events-none bg-white"
-            animate={isTransitioning ? { opacity: [0, 0, 0.92, 0] } : { opacity: 0 }}
+            animate={isTransitioning ? { opacity: [0, 0, 0.22, 0] } : { opacity: 0 }}
             transition={{ delay: 0.72, duration: 0.78, times: [0, 0.28, 0.72, 1], ease: "easeInOut" }}
             style={{ zIndex: 23 }}
           />
