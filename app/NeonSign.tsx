@@ -47,51 +47,7 @@ function Spark({ xOffset, yDrop, delay, duration, size }: any) {
   );
 }
 
-// ─── SVG Wire Layer (z:1, behind text, hidden when dark) ────────────────────
-function WireLayer({ isPowered }: { isPowered: boolean }) {
-  return (
-    <motion.svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{ zIndex: 1 }}
-      viewBox="0 0 1440 900"
-      preserveAspectRatio="xMidYMid slice"
-      animate={{ opacity: isPowered ? 1 : 0 }}
-      transition={{ duration: 0.8 }}
-    >
-      <defs>
-        <linearGradient id="wire-grad-1" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%"   stopColor="#888" stopOpacity="1" />
-          <stop offset="40%"  stopColor="#333" stopOpacity="1" />
-          <stop offset="100%" stopColor="#111" stopOpacity="1" />
-        </linearGradient>
-      </defs>
-
-      {/* Wire 1: 'W' → upper-left ceiling */}
-      <path d="M 500 420  Q 380 300  280 80" stroke="#111" strokeWidth="8" fill="none" strokeLinecap="round" />
-      <path d="M 500 420  Q 380 300  280 80" stroke="url(#wire-grad-1)" strokeWidth="5" fill="none" strokeLinecap="round" />
-      <path d="M 500 420  Q 380 300  280 80" stroke="#aaaaaa" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeDasharray="4 8" opacity="0.5" />
-
-      {/* Wire 2: 'e' → lower-right floor */}
-      <path d="M 940 470  Q 1060 620  1180 900" stroke="#111" strokeWidth="8" fill="none" strokeLinecap="round" />
-      <path d="M 940 470  Q 1060 620  1180 900" stroke="url(#wire-grad-1)" strokeWidth="5" fill="none" strokeLinecap="round" />
-      <path d="M 940 470  Q 1060 620  1180 900" stroke="#aaaaaa" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeDasharray="4 8" opacity="0.5" />
-
-      {/* Metal Clips */}
-      <g transform="translate(500, 420) rotate(-20)">
-        <rect x="-7" y="-10" width="14" height="20" rx="3" fill="#c0c0c0" stroke="#555" strokeWidth="1" />
-        <rect x="-4" y="-4"  width="8"  height="8"  rx="1" fill="#444"    stroke="#333" strokeWidth="0.5" />
-        <circle cx="0" cy="-6" r="1.5" fill="#888" />
-        <circle cx="0" cy=" 6" r="1.5" fill="#888" />
-      </g>
-      <g transform="translate(940, 470) rotate(18)">
-        <rect x="-7" y="-10" width="14" height="20" rx="3" fill="#c0c0c0" stroke="#555" strokeWidth="1" />
-        <rect x="-4" y="-4"  width="8"  height="8"  rx="1" fill="#444"    stroke="#333" strokeWidth="0.5" />
-        <circle cx="0" cy="-6" r="1.5" fill="#888" />
-        <circle cx="0" cy=" 6" r="1.5" fill="#888" />
-      </g>
-    </motion.svg>
-  );
-}
+// ─── Spark particle ───────────────────────────────────────────────────────────
 
 // ─── Mechanical Lever ─────────────────────────────────────────────────────────
 const SLOT_H  = 133; // 2/3 of original 200px
@@ -379,9 +335,6 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
               }}
             />
           </motion.div>
-
-          {/* ── Layer 1: SVG Wire (z:1, hidden when dark) ─────────────── */}
-          <WireLayer isPowered={isPowered} />
 
           {/* ── Layer 2: Neon Text (z:2) ──────────────────────────────── */}
           <div
