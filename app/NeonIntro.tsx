@@ -60,31 +60,12 @@ function BackgroundWires() {
         className="absolute inset-0"
         style={{
           overflow: "visible",
-          filter: "drop-shadow(0 3px 5px rgba(0,0,0,0.65))",
+          filter: "drop-shadow(0 0 1px rgba(0,0,0,0.5))",
         }}
       >
-        <g fill="none" strokeLinecap="round">
+        <g fill="none" stroke="#1a1a1a" strokeLinecap="round" strokeWidth="1.5">
           <path
-            d="M -230 -34 C -305 -95 -330 -190 -285 -330 C -260 -410 -225 -500 -250 -650"
-            stroke="#2a2a2a"
-            strokeWidth="7"
-          />
-          <path
-            d="M 210 -20 C 290 -75 350 -130 430 -155 C 540 -190 650 -175 820 -245"
-            stroke="#2a2a2a"
-            strokeWidth="7"
-          />
-          <path
-            d="M -230 -34 C -305 -95 -330 -190 -285 -330 C -260 -410 -225 -500 -250 -650"
-            stroke="rgba(255,255,255,0.16)"
-            strokeWidth="2"
-            transform="translate(-1 -1)"
-          />
-          <path
-            d="M 210 -20 C 290 -75 350 -130 430 -155 C 540 -190 650 -175 820 -245"
-            stroke="rgba(255,255,255,0.16)"
-            strokeWidth="2"
-            transform="translate(-1 -1)"
+            d="M -230 -34 C -285 8 -330 74 -352 150 C -374 226 -438 306 -560 392"
           />
         </g>
       </svg>
@@ -92,28 +73,28 @@ function BackgroundWires() {
       <div
         className="absolute"
         style={{
-          left: "calc(50% - 230px)",
-          top: "calc(50% - 34px)",
-          width: 14,
-          height: 14,
+          left: "calc(50% - 235px)",
+          top: "calc(50% - 39px)",
+          width: 10,
+          height: 10,
           borderRadius: "50%",
-          background: "radial-gradient(circle at 35% 30%, #f1f1f1 0%, #9a9a9a 38%, #4b4b4b 100%)",
-          border: "1px solid rgba(255,255,255,0.35)",
-          boxShadow: "0 2px 5px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.45)",
+          background: "#8a8a8a",
+          border: "1px solid rgba(255,255,255,0.25)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.55), inset 0 1px 1px rgba(255,255,255,0.35)",
         }}
       />
 
       <div
         className="absolute"
         style={{
-          left: "calc(50% + 210px)",
+          left: "calc(50% + 220px)",
           top: "calc(50% - 20px)",
-          width: 14,
-          height: 14,
+          width: 10,
+          height: 10,
           borderRadius: "50%",
-          background: "radial-gradient(circle at 35% 30%, #f1f1f1 0%, #9a9a9a 38%, #4b4b4b 100%)",
-          border: "1px solid rgba(255,255,255,0.35)",
-          boxShadow: "0 2px 5px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.45)",
+          background: "#8a8a8a",
+          border: "1px solid rgba(255,255,255,0.25)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.55), inset 0 1px 1px rgba(255,255,255,0.35)",
         }}
       />
     </div>
