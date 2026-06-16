@@ -1432,39 +1432,57 @@ function InteractiveText() {
 
   useFrame(() => {
     if (!groupRef.current) return;
-    const expansion = Math.abs(mouse.x) * 1.5;
+    // 마우스 거리에 따른 팽창 폭 증가
+    const expansion = Math.abs(mouse.x) * 2.5;
     
     groupRef.current.children.forEach((child, i) => {
       const offsetFromCenter = i - 3;
-      const targetX = offsetFromCenter * (1.2 + expansion);
-      child.position.x = THREE.MathUtils.lerp(child.position.x, targetX, 0.1);
       
-      const targetZ = Math.sin(Date.now() * 0.002 + i) * 0.2;
-      child.position.z = THREE.MathUtils.lerp(child.position.z, targetZ, 0.1);
+      // 1. 넓이 조절
+      const targetX = offsetFromCenter * (1.6 + expansion);
+      child.position.x = THREE.MathUtils.lerp(child.position.x, targetX, 0.08);
       
-      const targetRotY = mouse.x * 0.2 * offsetFromCenter;
-      child.rotation.y = THREE.MathUtils.lerp(child.rotation.y, targetRotY, 0.1);
+      // 2. Y, Z 유기적 움직임
+      const targetY = Math.sin(Date.now() * 0.001 + i) * 0.15;
+      child.position.y = THREE.MathUtils.lerp(child.position.y, targetY, 0.08);
+      
+      // 3. 중심축 기준 미세 회전 (조형미)
+      // 마우스가 멀어질수록 벌어지면서 바깥을 향해 회전함
+      const targetRotY = offsetFromCenter * mouse.x * 0.2;
+      const targetRotX = mouse.y * 0.2;
+      const targetRotZ = offsetFromCenter * mouse.x * -0.05;
+      
+      child.rotation.x = THREE.MathUtils.lerp(child.rotation.x, targetRotX, 0.08);
+      child.rotation.y = THREE.MathUtils.lerp(child.rotation.y, targetRotY, 0.08);
+      child.rotation.z = THREE.MathUtils.lerp(child.rotation.z, targetRotZ, 0.08);
     });
   });
 
   return (
-    <group ref={groupRef} position={[0, 1, 0]}>
+    <group ref={groupRef} position={[0, 1.5, 0]}>
       {letters.map((char, i) => (
         <group key={i}>
           <Center>
             <Text3D
               font={FONT_URL}
-              size={1.5}
-              height={0.4}
+              size={2.2}
+              height={2.0}          // 아주 두꺼운 매스감
+              curveSegments={32}
               bevelEnabled
-              bevelThickness={0.03}
-              bevelSize={0.02}
+              bevelThickness={0.15} // 확실한 옆면 반사각
+              bevelSize={0.06}
+              bevelOffset={0}
+              bevelSegments={10}
+              castShadow
+              receiveShadow
             >
               {char}
               <meshPhysicalMaterial 
-                color="#ffffff"
-                metalness={0.9} 
+                color="#e5e5e5"
+                metalness={0.95} 
                 roughness={0.1} 
+                clearcoat={1.0}
+                clearcoatRoughness={0.1}
                 envMapIntensity={2.5}
               />
             </Text3D>
@@ -1477,40 +1495,62 @@ function InteractiveText() {
 
 function ExploreButton({ onClick, visible }: { onClick: () => void, visible: boolean }) {
   const [hovered, setHovered] = useState(false);
-  const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
   
   useFrame(() => {
-    if (meshRef.current) {
+    if (groupRef.current) {
       const targetScale = hovered ? 1.05 : 1.0;
-      meshRef.current.scale.setScalar(THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale, 0.1));
+      groupRef.current.scale.setScalar(THREE.MathUtils.lerp(groupRef.current.scale.x, targetScale, 0.1));
+      
+      // Floating effect
+      groupRef.current.position.y = THREE.MathUtils.lerp(
+        groupRef.current.position.y,
+        -3.0 + Math.sin(Date.now() * 0.002) * 0.15,
+        0.1
+      );
     }
   });
 
   if (!visible) return null;
 
   return (
-    <group position={[0, -2, 0]}>
+    <group ref={groupRef} position={[0, -3.0, 0]}>
       <mesh 
-        ref={meshRef}
+        rotation={[0, 0, Math.PI / 2]} 
         onPointerOver={() => { setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'default'; }}
         onClick={() => { document.body.style.cursor = 'default'; onClick(); }}
+        castShadow
       >
-        <boxGeometry args={[4, 1.2, 0.2]} />
+        <capsuleGeometry args={[0.7, 3.8, 16, 32]} />
         <meshPhysicalMaterial 
-          color={hovered ? "#ff2a85" : "#1a1a1a"} 
-          metalness={0.5} 
-          roughness={0.2}
-          emissive={hovered ? "#ff2a85" : "#000000"}
-          emissiveIntensity={hovered ? 0.5 : 0}
+          color="#050505" 
+          metalness={0.9} 
+          roughness={0.15}
+          clearcoat={1.0}
+        />
+      </mesh>
+
+      {/* Wireframe glowing accent */}
+      <mesh rotation={[0, 0, Math.PI / 2]}>
+        <capsuleGeometry args={[0.72, 3.82, 16, 32]} />
+        <meshBasicMaterial 
+          color={hovered ? "#ff2a85" : "#4a90e2"} 
+          wireframe 
+          transparent 
+          opacity={hovered ? 0.5 : 0.15} 
         />
       </mesh>
       
-      <group position={[0, 0, 0.15]}>
+      <group position={[0, 0, 0.7]}>
         <Center>
-          <Text3D font={FONT_URL} size={0.4} height={0.05}>
+          <Text3D font={FONT_URL} size={0.35} height={0.1} curveSegments={24} bevelEnabled bevelThickness={0.01} bevelSize={0.01}>
             EXPLORE
-            <meshStandardMaterial color={hovered ? "#ffffff" : "#ff2a85"} />
+            <meshStandardMaterial 
+              color={hovered ? "#ffffff" : "#cccccc"} 
+              emissive={hovered ? "#ff2a85" : "#4a90e2"} 
+              emissiveIntensity={hovered ? 1.5 : 0.8} 
+            />
           </Text3D>
         </Center>
       </group>
@@ -1587,14 +1627,22 @@ function ThreeDIntro({ onExplore }: { onExplore: () => void }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-[100] bg-black"
+      className="fixed inset-0 z-[100] bg-[#030303]"
       exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
     >
-      <Canvas camera={{ position: [0, 0, 10], fov: 45 }}>
+      <Canvas camera={{ position: [0, 0, 16], fov: 45 }} dpr={[1, 2]} shadows>
         <color attach="background" args={["#000000"]} />
         <Environment preset="city" />
-        <directionalLight position={[5, 5, 5]} intensity={1.5} color="#ffffff" />
-        <directionalLight position={[-5, 5, 5]} intensity={0.8} color="#4a90e2" />
+        
+        {/* 극적인 볼륨감을 위한 조명 세팅 */}
+        {/* 1. 위에서 내리꽂는 주광 (White) */}
+        <pointLight position={[0, 10, 5]} intensity={800} color="#ffffff" castShadow />
+        
+        {/* 2. 아래에서 은은하게 올려치는 반사광 (Cool Blue) */}
+        <pointLight position={[0, -10, -5]} intensity={500} color="#4a90e2" />
+        
+        {/* 3. 우측면 엑센트 조명 (Pink/Magenta 계열로 포인트) */}
+        <pointLight position={[10, 0, 5]} intensity={400} color="#ff2a85" />
         
         <InteractiveText />
         <ExploreButton visible={showExplore} onClick={handleExploreClick} />
