@@ -1,7 +1,52 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
+
+// Helper to generate spark data so it's stable across renders
+const generateSparks = (count: number) => {
+  return Array.from({ length: count }).map((_, i) => ({
+    id: i,
+    x: (Math.random() - 0.5) * 400, // spread X
+    y: (Math.random() - 0.5) * 300, // spread Y
+    delay: Math.random() * 3,
+    duration: 0.8 + Math.random() * 1.5,
+    size: Math.random() * 3 + 1,
+    color: Math.random() > 0.5 ? "#ff2a85" : "#00d4ff",
+  }));
+};
+
+function Spark({ x, y, delay, duration, size, color }: any) {
+  return (
+    <motion.div
+      className="absolute rounded-full"
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: "#fff",
+        boxShadow: `0 0 6px 2px ${color}`,
+        mixBlendMode: "screen",
+        left: "50%",
+        top: "50%",
+        zIndex: 5,
+      }}
+      initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+      animate={{
+        x: [0, x * 0.5, x],
+        y: [0, y * 0.5 - 50, y - 20], // subtle arc upwards
+        opacity: [0, 1, 0],
+        scale: [0, 1.2, 0],
+      }}
+      transition={{
+        duration: duration,
+        delay: delay,
+        repeat: Infinity,
+        repeatDelay: Math.random() * 3 + 1,
+        ease: "easeOut",
+      }}
+    />
+  );
+}
 
 export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -29,11 +74,6 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
   const offsetX = (mousePos.x - 0.5) * 30;
   const offsetY = (mousePos.y - 0.5) * 30;
   
-  // 3-Layer Text Shadow Strategy:
-  // 1. Core (White, sharp)
-  // 2. Main Glow (Color, medium blur)
-  // 3. Ambient Spread (Color, huge blur, reacts to mouse)
-  
   const neonShadowPink = `
     0 0 2px #fff,
     0 0 4px #fff,
@@ -53,28 +93,37 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     ${offsetX * 0.5}px ${offsetY * 0.5}px 60px #00d4ff
   `;
 
-  // Erratic flicker for the "faulty neon" look
+  // Pre-calculate an exponentially accelerating 3-second flicker
+  const { opacities, times } = useMemo(() => {
+    const steps = 30;
+    const op = [];
+    const tm = [];
+    for (let i = 0; i <= steps; i++) {
+      const progress = i / steps;
+      // Exponential curve: time intervals get much shorter at the end
+      const timeProg = Math.pow(progress, 3);
+      tm.push(timeProg);
+      // Toggle between OFF (0.1) and ON (1). Towards the end, randomly skip some OFFs for natural glitch
+      let val = i % 2 === 0 ? 0.1 : 1;
+      if (progress > 0.8 && Math.random() > 0.5) val = 1;
+      op.push(val);
+    }
+    op[op.length - 1] = 1; // force ON at end
+    tm[tm.length - 1] = 1;
+    return { opacities: op, times: tm };
+  }, []);
+
   const erraticFlicker: Variants = {
-    initial: { opacity: 0, textShadow: "none", color: "#222" },
+    initial: { opacity: 0.1, textShadow: "none", color: "#222" },
     animate: {
-      opacity: [0, 1, 0, 1, 0.2, 1, 0.8, 1, 1],
-      color: ["#222", "#fff", "#222", "#fff", "#eee", "#fff", "#fff", "#fff", "#fff"],
-      textShadow: [
-        "none",
-        neonShadowPink,
-        "none",
-        neonShadowPink,
-        "none",
-        neonShadowPink,
-        neonShadowPink,
-        neonShadowPink,
-        neonShadowPink
-      ],
+      opacity: opacities,
+      color: opacities.map((o) => (o === 1 ? "#fff" : "#222")),
+      textShadow: opacities.map((o) => (o === 1 ? neonShadowPink : "none")),
       transition: {
-        duration: 1.8,
-        times: [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.4, 0.5, 1],
+        duration: 3, // Total 3 seconds
+        times: times,
         ease: "linear",
-      }
+      },
     },
     exit: { 
       opacity: 0,
@@ -83,6 +132,8 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
       transition: { duration: 1.0, ease: "easeOut" } 
     }
   };
+
+  const sparks = useMemo(() => generateSparks(25), []);
 
   return (
     <AnimatePresence>
@@ -94,17 +145,14 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
           exit="exit"
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center cursor-pointer overflow-hidden"
           style={{
-            // Very dark background to make neon pop
             backgroundColor: "#050505",
             backgroundImage: `radial-gradient(circle at 50% 50%, #151515 0%, #000000 100%)`,
           }}
         >
-          {/* Inject elegant Google Fonts */}
           <style dangerouslySetInnerHTML={{__html: `
             @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
           `}} />
 
-          {/* Concrete Texture Overlay */}
           <div className="absolute inset-0 opacity-[0.15] pointer-events-none mix-blend-overlay" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
           }}></div>
@@ -113,33 +161,35 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             variants={erraticFlicker}
             initial="initial"
             animate="animate"
-            exit="exit"
             className="relative z-10 flex flex-col items-center"
-            // Screen blend mode ensures the light literally 'adds' to the background texture
             style={{ mixBlendMode: "screen" }}
           >
-            {/* Continuous random flicker loop */}
+            {/* Sparks erupting from the center */}
+            <div className="absolute inset-0 pointer-events-none">
+              {sparks.map((spark) => (
+                <Spark key={spark.id} {...spark} />
+              ))}
+            </div>
+
+            {/* Continuous idle flicker (starts after the 3s initial animation) */}
             <motion.div
-              animate={{
-                opacity: [1, 0.7, 1, 0.4, 1, 0.9, 1, 1, 1],
-              }}
+              animate={{ opacity: [1, 0.7, 1, 0.4, 1, 0.9, 1, 1, 1] }}
               transition={{
+                delay: 3, // wait for 3s initial sequence
                 duration: 5,
                 repeat: Infinity,
                 repeatType: "mirror",
                 ease: "linear",
                 times: [0, 0.1, 0.2, 0.25, 0.3, 0.5, 0.6, 0.8, 1]
               }}
-              className="flex flex-col items-center"
+              className="flex flex-col items-center relative z-10"
             >
               <h1 
                 className="text-7xl md:text-9xl lg:text-[11rem] font-normal text-white mb-2"
                 style={{
                   fontFamily: "'Pinyon Script', cursive",
                   textShadow: neonShadowPink,
-                  // Tweak line-height so cursive tails don't get clipped
                   lineHeight: "1.2",
-                  // A slight rotation makes script fonts look more like mounted glass tubes
                   transform: "rotate(-4deg)"
                 }}
               >
@@ -162,7 +212,7 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 0.5, 0] }}
-            transition={{ duration: 3, repeat: Infinity, delay: 2 }}
+            transition={{ duration: 3, repeat: Infinity, delay: 3.5 }}
             className="absolute bottom-12 text-zinc-600 tracking-[0.4em] text-xs font-light z-10 uppercase font-sans"
           >
             Click Anywhere to Enter
