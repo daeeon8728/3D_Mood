@@ -86,21 +86,6 @@ const startBuzzSound = () => {
   };
 };
 
-// Generate White Noise Buffer for Spray
-let noiseBuffer: AudioBuffer | null = null;
-const getNoiseBuffer = () => {
-  if (!audioCtx) return null;
-  if (noiseBuffer) return noiseBuffer;
-  const bufferSize = audioCtx.sampleRate * 2; // 2 sec loop
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
-  noiseBuffer = buffer;
-  return buffer;
-};
-
 // ─── Spark particle ───────────────────────────────────────────────────────────
 const generateSparks = (count: number) =>
   Array.from({ length: count }).map((_, i) => ({
@@ -242,76 +227,23 @@ function MechanicalLever({ onSnap }: LeverProps) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
   const containerRef            = useRef<HTMLDivElement>(null);
-  const canvasRef               = useRef<HTMLCanvasElement>(null);
   
   const [mousePos, setMousePos]       = useState({ x: 50, y: 50 });
   const [isPowered, setIsPowered]     = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isShaking, setIsShaking]     = useState(false);
-  const [isSprayingMode, setIsSprayingMode] = useState(false);
   
   const sparks = useMemo(() => generateSparks(18), []);
   const buzzAudio = useRef<{stop: ()=>void} | null>(null);
 
-  // --- Graffiti Canvas Logic ---
-  const isDrawing = useRef(false);
-  const lastPos = useRef<{x: number, y: number, time: number} | null>(null);
-  const spraySrc = useRef<AudioBufferSourceNode | null>(null);
-  const sprayGain = useRef<GainNode | null>(null);
-
+  // Clean up audio on unmount
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      const handleResize = () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-      };
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }
+    return () => {
+      if (buzzAudio.current) buzzAudio.current.stop();
+    };
   }, []);
 
-  const stopSprayAudio = useCallback(() => {
-    if (spraySrc.current && sprayGain.current && audioCtx) {
-      const t = audioCtx.currentTime;
-      sprayGain.current.gain.linearRampToValueAtTime(0, t + 0.1);
-      spraySrc.current.stop(t + 0.1);
-      spraySrc.current = null;
-    }
-  }, []);
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (!isSprayingMode || isPowered) return;
-    isDrawing.current = true;
-    lastPos.current = { x: e.clientX, y: e.clientY, time: e.timeStamp };
-
-    initAudio();
-    if (audioCtx) {
-      const buf = getNoiseBuffer();
-      if (buf) {
-        spraySrc.current = audioCtx.createBufferSource();
-        spraySrc.current.buffer = buf;
-        spraySrc.current.loop = true;
-        
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = "bandpass";
-        filter.frequency.value = 3000;
-        filter.Q.value = 1.0;
-
-        sprayGain.current = audioCtx.createGain();
-        sprayGain.current.gain.value = 0; // Will be modulated by speed
-        
-        spraySrc.current.connect(filter);
-        filter.connect(sprayGain.current);
-        sprayGain.current.connect(audioCtx.destination);
-        spraySrc.current.start();
-      }
-    }
-  }, [isSprayingMode, isPowered]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Flashlight logic
     if (containerRef.current) {
       const { left, top, width, height } = containerRef.current.getBoundingClientRect();
@@ -320,64 +252,10 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
         y: ((e.clientY - top)  / height) * 100,
       });
     }
-
-    if (!isDrawing.current || !isSprayingMode || !canvasRef.current || isPowered) return;
-    
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx || !lastPos.current) return;
-
-    const currentPos = { x: e.clientX, y: e.clientY, time: e.timeStamp };
-    const dx = currentPos.x - lastPos.current.x;
-    const dy = currentPos.y - lastPos.current.y;
-    const dt = currentPos.time - lastPos.current.time;
-    
-    if (dt === 0) return;
-    
-    const speed = Math.sqrt(dx*dx + dy*dy) / dt; // pixels per ms
-    
-    // User requested: "흔들수록 진하게 나오고 안흔들면 연하게"
-    // Higher speed -> higher opacity. Map speed 0~3 to opacity 0.05~0.8
-    const targetOpacity = Math.min(0.9, Math.max(0.02, speed * 0.4));
-    
-    // Update audio volume based on speed (more shake = louder spray)
-    if (sprayGain.current && audioCtx) {
-      sprayGain.current.gain.setTargetAtTime(targetOpacity * 0.5, audioCtx.currentTime, 0.05);
-    }
-
-    // Draw spray (scattered points or radial gradient)
-    const radius = 25 + Math.random() * 15;
-    const grad = ctx.createRadialGradient(currentPos.x, currentPos.y, 0, currentPos.x, currentPos.y, radius);
-    grad.addColorStop(0, `rgba(255, 0, 100, ${targetOpacity})`);
-    grad.addColorStop(0.5, `rgba(255, 0, 100, ${targetOpacity * 0.3})`);
-    grad.addColorStop(1, 'rgba(255, 0, 100, 0)');
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(currentPos.x, currentPos.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    lastPos.current = currentPos;
-  }, [isSprayingMode, isPowered]);
-
-  const handlePointerUp = useCallback(() => {
-    isDrawing.current = false;
-    lastPos.current = null;
-    stopSprayAudio();
-  }, [stopSprayAudio]);
-
-  // Clean up audio on unmount
-  useEffect(() => {
-    return () => {
-      stopSprayAudio();
-      if (buzzAudio.current) buzzAudio.current.stop();
-    };
-  }, [stopSprayAudio]);
+  }, []);
 
   // Lever snap event
   const handleSnap = useCallback(() => {
-    if (isSprayingMode) {
-      setIsSprayingMode(false); // disable spray when powering on
-    }
     // Screen shake
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 300);
@@ -387,7 +265,7 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
       setIsPowered(true);
       buzzAudio.current = startBuzzSound();
     }, 300);
-  }, [isSprayingMode]);
+  }, []);
 
   // Click to exit after powered
   const handleClick = () => {
@@ -442,10 +320,7 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
       {!isFadingOut && (
         <motion.div
           ref={containerRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
+          onMouseMove={handleMouseMove}
           exit="exit"
           variants={exitVariant}
           animate={isShaking ? {
@@ -455,13 +330,12 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
           } : {}}
           className="fixed inset-0 z-[100] overflow-hidden bg-[#050505]"
           style={{ 
-            cursor: isPowered ? "pointer" : isSprayingMode ? "crosshair" : "default",
-            touchAction: "none" // Prevent scrolling while drawing
+            cursor: isPowered ? "pointer" : "default",
           }}
           onClick={handleClick}
         >
           <style dangerouslySetInnerHTML={{ __html: `
-            @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&family=Black+Ops+One&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
           ` }} />
 
           {/* ── Layer 0: Concrete Texture ──────────────────────────── */}
@@ -488,13 +362,6 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
               background: `radial-gradient(circle 280px at ${mousePos.x}% ${mousePos.y}%, rgba(255,255,255,0.07), transparent)`,
               zIndex: 0,
             }}
-          />
-
-          {/* ── Layer 1: Graffiti Canvas ──────────────────────────── */}
-          <canvas
-            ref={canvasRef}
-            className="absolute inset-0 pointer-events-none"
-            style={{ zIndex: 1, opacity: isPowered ? 0.6 : 1, transition: "opacity 0.6s" }}
           />
 
           {/* ── Layer 1.5: Wall Bloom ─────── */}
@@ -543,31 +410,12 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
 
           {/* ── UI Layer (z:10) ─────────────────────────────────────────── */}
           
-          {/* Left Panel: Drawing Stencil */}
-          <div className="absolute left-10 md:left-24 top-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 10 }}>
-             <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: isPowered ? 0 : 0.6, x: 0 }}
-                transition={{ duration: 1, delay: 0.5 }}
-                className="select-none"
-                style={{
-                  fontFamily: "'Black Ops One', system-ui",
-                  fontSize: "clamp(2rem, 5vw, 4rem)",
-                  color: "transparent",
-                  WebkitTextStroke: "2px #fff",
-                  transform: "rotate(-9deg)",
-                }}
-             >
-                drawing!
-             </motion.div>
-          </div>
-
-          {/* Center Panel: Explore Lever */}
+          {/* Right Panel: POWER Lever */}
           <div
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2"
-            style={{ zIndex: 10, marginTop: "180px" }} // Pushed down slightly to not overlap neon
+            className="absolute right-16 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2"
+            style={{ zIndex: 10 }}
             onClick={e => e.stopPropagation()}
-            onPointerDown={e => e.stopPropagation()} // Prevent spray when interacting with lever
+            onPointerDown={e => e.stopPropagation()}
           >
             <div
               className="p-4 rounded-2xl flex flex-col items-center gap-1"
@@ -578,71 +426,27 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
               }}
             >
               <p className="text-[8px] font-bold tracking-[0.3em] text-zinc-600 uppercase mb-2">
-                EXPLORE
+                POWER
               </p>
               <MechanicalLever onSnap={handleSnap} />
             </div>
           </div>
 
-          {/* Right Panel: Spray Can */}
-          <div
-            className="absolute right-10 md:right-24 top-1/2 -translate-y-1/2 flex flex-col items-center gap-4"
-            style={{ zIndex: 10 }}
-            onClick={e => e.stopPropagation()}
-            onPointerDown={e => e.stopPropagation()} // Prevent drawing on the can itself
-          >
-             <motion.button
-                type="button"
-                className="relative cursor-pointer focus:outline-none flex flex-col items-center justify-center"
-                onClick={() => {
-                   initAudio(); // Required on first user interaction
-                   setIsSprayingMode(!isSprayingMode);
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                animate={{ opacity: isPowered ? 0 : 1 }}
-                style={{ pointerEvents: isPowered ? "none" : "auto" }}
-             >
-                {/* Simple SVG Spray Can icon */}
-                <svg width="64" height="120" viewBox="0 0 64 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                   {/* Cap/Nozzle */}
-                   <path d="M 24 10 L 40 10 L 40 20 L 24 20 Z" fill="#666" />
-                   <path d="M 30 5 L 34 5 L 34 10 L 30 10 Z" fill="#ddd" />
-                   <circle cx="28" cy="15" r="2" fill="#222" />
-                   
-                   {/* Can Body */}
-                   <rect x="12" y="20" width="40" height="90" rx="6" fill="url(#canGrad)" stroke="#333" strokeWidth="2" />
-                   <rect x="12" y="30" width="40" height="40" fill="#E83E8C" opacity="0.8" />
-                   
-                   <defs>
-                      <linearGradient id="canGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                         <stop offset="0%" stopColor="#888" />
-                         <stop offset="50%" stopColor="#ccc" />
-                         <stop offset="100%" stopColor="#555" />
-                      </linearGradient>
-                   </defs>
-                </svg>
-                
-                {/* Label text */}
-                <div className="mt-4 flex flex-col items-center text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">
-                   <span>on the wall</span>
-                   <span>(shake it)</span>
-                </div>
-                
-                {/* Active Indicator Glow */}
-                <AnimatePresence>
-                   {isSprayingMode && (
-                      <motion.div
-                         className="absolute inset-0 rounded-full"
-                         initial={{ opacity: 0, boxShadow: "0 0 0px #E83E8C" }}
-                         animate={{ opacity: 1, boxShadow: "0 0 30px #E83E8C" }}
-                         exit={{ opacity: 0 }}
-                         style={{ zIndex: -1, top: 10, bottom: 20 }}
-                      />
-                   )}
-                </AnimatePresence>
-             </motion.button>
-          </div>
+          {/* ── Pre-power hint ────────────────────────────────────────── */}
+          <AnimatePresence>
+            {!isPowered && (
+              <motion.p
+                key="hint"
+                className="absolute bottom-10 left-1/2 -translate-x-1/2 text-zinc-600 text-[10px] uppercase tracking-[0.4em] font-light z-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 0.6, 0] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 2.5, repeat: Infinity, delay: 1 }}
+              >
+                Pull the lever to power on
+              </motion.p>
+            )}
+          </AnimatePresence>
 
           {/* ── Post-power hint ───────────────────────────────────────── */}
           <AnimatePresence>
