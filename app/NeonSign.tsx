@@ -182,7 +182,7 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
             }}
             transition={{ duration: 3, times: times, ease: "linear" }}
             style={{
-              backgroundImage: \`url('/콘크리트_텍스처.jpg')\`,
+              backgroundImage: `url('/콘크리트_텍스처.jpg')`,
               backgroundBlendMode: 'overlay',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
@@ -194,7 +194,7 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
           <div 
             className="absolute inset-0 pointer-events-none mix-blend-screen"
             style={{
-              background: \`radial-gradient(circle 300px at \${mousePos.x}% \${mousePos.y}%, rgba(255,255,255,0.08), transparent)\`,
+              background: `radial-gradient(circle 300px at ${mousePos.x}% ${mousePos.y}%, rgba(255,255,255,0.08), transparent)`,
               zIndex: 0,
             }}
           />
