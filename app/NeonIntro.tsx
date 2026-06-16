@@ -1,22 +1,24 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
 // Helper to generate spark data so it's stable across renders
 const generateSparks = (count: number) => {
   return Array.from({ length: count }).map((_, i) => ({
     id: i,
-    x: (Math.random() - 0.5) * 400, // spread X
-    y: (Math.random() - 0.5) * 300, // spread Y
-    delay: Math.random() * 3,
-    duration: 0.8 + Math.random() * 1.5,
-    size: Math.random() * 3 + 1,
-    color: Math.random() > 0.5 ? "#ff2a85" : "#00d4ff",
+    // Spreading slightly from the end of the letter 'e'
+    xOffset: (Math.random() - 0.5) * 40, 
+    // Gravity effect: drops down significantly
+    yDrop: 100 + Math.random() * 150, 
+    delay: Math.random() * 2,
+    duration: 0.6 + Math.random() * 0.8,
+    size: Math.random() * 3 + 2,
+    color: Math.random() > 0.5 ? "#FF4500" : "#FF8C00", // Orange/Red
   }));
 };
 
-function Spark({ x, y, delay, duration, size, color }: any) {
+function Spark({ xOffset, yDrop, delay, duration, size, color }: any) {
   return (
     <motion.div
       className="absolute rounded-full"
@@ -26,14 +28,15 @@ function Spark({ x, y, delay, duration, size, color }: any) {
         backgroundColor: "#fff",
         boxShadow: `0 0 6px 2px ${color}`,
         mixBlendMode: "screen",
-        left: "50%",
-        top: "50%",
-        zIndex: 5,
+        // Positioned roughly at the end of the 'Welcome' cursive tail
+        left: "calc(50% + 180px)",
+        top: "calc(50% + 10px)",
+        zIndex: 5, // Above text
       }}
       initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
       animate={{
-        x: [0, x * 0.5, x],
-        y: [0, y * 0.5 - 50, y - 20], // subtle arc upwards
+        x: [0, xOffset * 0.5, xOffset],
+        y: [0, yDrop * 0.2, yDrop], // Accelerates downwards (gravity)
         opacity: [0, 1, 0],
         scale: [0, 1.2, 0],
       }}
@@ -41,10 +44,37 @@ function Spark({ x, y, delay, duration, size, color }: any) {
         duration: duration,
         delay: delay,
         repeat: Infinity,
-        repeatDelay: Math.random() * 3 + 1,
-        ease: "easeOut",
+        repeatDelay: Math.random() * 1.5 + 0.5,
+        ease: "easeIn", // Gravity accelerates
       }}
     />
+  );
+}
+
+// Draw realistic-looking wires connecting the neon tubes
+function BackgroundWires() {
+  return (
+    <svg 
+      className="absolute inset-0 w-full h-full pointer-events-none" 
+      style={{ zIndex: 1, opacity: 0.8 }}
+      preserveAspectRatio="none"
+    >
+      <defs>
+        <filter id="drop-shadow">
+          <feDropShadow dx="2" dy="5" stdDeviation="4" floodColor="#000" floodOpacity="0.8"/>
+        </filter>
+      </defs>
+      <g filter="url(#drop-shadow)" stroke="#0a0a0a" strokeWidth="6" fill="none" strokeLinecap="round">
+        {/* Main power line coming from top left ceiling */}
+        <path d="M 30% -10% Q 35% 30% 45% 48%" />
+        {/* Wire looping behind 'Welcome' */}
+        <path d="M 45% 48% Q 50% 55% 55% 52%" strokeWidth="4" />
+        {/* Wire connecting to 'made by daeeon' */}
+        <path d="M 55% 52% Q 58% 65% 55% 62%" strokeWidth="3" />
+        {/* Wire exiting to the right floor */}
+        <path d="M 55% 62% Q 65% 70% 80% 110%" strokeWidth="5" />
+      </g>
+    </svg>
   );
 }
 
@@ -53,7 +83,6 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   
-  // Track mouse for subtle shadow shift (Layer 3: Ambient spread)
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
     const { left, top, width, height } = containerRef.current.getBoundingClientRect();
@@ -70,7 +99,6 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     }, 1200);
   };
 
-  // Shadow calculations based on mouse (parallax effect on ambient glow)
   const offsetX = (mousePos.x - 0.5) * 30;
   const offsetY = (mousePos.y - 0.5) * 30;
   
@@ -93,34 +121,31 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     ${offsetX * 0.5}px ${offsetY * 0.5}px 60px #00d4ff
   `;
 
-  // Pre-calculate an exponentially accelerating 3-second flicker
   const { opacities, times } = useMemo(() => {
     const steps = 30;
     const op = [];
     const tm = [];
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
-      // Exponential curve: time intervals get much shorter at the end
       const timeProg = Math.pow(progress, 3);
       tm.push(timeProg);
-      // Toggle between OFF (0.1) and ON (1). Towards the end, randomly skip some OFFs for natural glitch
-      let val = i % 2 === 0 ? 0.1 : 1;
+      let val = i % 2 === 0 ? 0.05 : 1;
       if (progress > 0.8 && Math.random() > 0.5) val = 1;
       op.push(val);
     }
-    op[op.length - 1] = 1; // force ON at end
+    op[op.length - 1] = 1;
     tm[tm.length - 1] = 1;
     return { opacities: op, times: tm };
   }, []);
 
   const erraticFlicker: Variants = {
-    initial: { opacity: 0.1, textShadow: "none", color: "#222" },
+    initial: { opacity: 0.05, textShadow: "none", color: "#111" },
     animate: {
       opacity: opacities,
-      color: opacities.map((o) => (o === 1 ? "#fff" : "#222")),
+      color: opacities.map((o) => (o === 1 ? "#fff" : "#111")),
       textShadow: opacities.map((o) => (o === 1 ? neonShadowPink : "none")),
       transition: {
-        duration: 3, // Total 3 seconds
+        duration: 3,
         times: times,
         ease: "linear",
       },
@@ -133,7 +158,7 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     }
   };
 
-  const sparks = useMemo(() => generateSparks(25), []);
+  const sparks = useMemo(() => generateSparks(20), []);
 
   return (
     <AnimatePresence>
@@ -146,43 +171,53 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center cursor-pointer overflow-hidden"
           style={{
             backgroundColor: "#050505",
-            backgroundImage: `radial-gradient(circle at 50% 50%, #151515 0%, #000000 100%)`,
+            backgroundImage: `radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%)`,
           }}
         >
           <style dangerouslySetInnerHTML={{__html: `
             @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
           `}} />
 
-          <div className="absolute inset-0 opacity-[0.15] pointer-events-none mix-blend-overlay" style={{
+          {/* Layer 0: Concrete Texture (z-index: 0 implies bottom within stacking context) */}
+          <div className="absolute inset-0 opacity-[0.25] pointer-events-none mix-blend-overlay" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+            zIndex: 0,
           }}></div>
 
+          {/* Layer 1: Background Wiring */}
+          <BackgroundWires />
+
+          {/* Wrapper to sync sparks with flicker opacity */}
+          <motion.div
+             animate={{ opacity: opacities }}
+             transition={{ duration: 3, times: times, ease: "linear" }}
+             className="absolute inset-0 pointer-events-none z-[5]"
+          >
+            {/* Layer 3: Particles (Orange/Red Sparks falling from the 'e' tail) */}
+            {sparks.map((spark) => (
+              <Spark key={spark.id} {...spark} />
+            ))}
+          </motion.div>
+
+          {/* Layer 2: Neon Sign Text */}
           <motion.div
             variants={erraticFlicker}
             initial="initial"
             animate="animate"
-            className="relative z-10 flex flex-col items-center"
+            className="relative z-[2] flex flex-col items-center"
             style={{ mixBlendMode: "screen" }}
           >
-            {/* Sparks erupting from the center */}
-            <div className="absolute inset-0 pointer-events-none">
-              {sparks.map((spark) => (
-                <Spark key={spark.id} {...spark} />
-              ))}
-            </div>
-
-            {/* Continuous idle flicker (starts after the 3s initial animation) */}
             <motion.div
               animate={{ opacity: [1, 0.7, 1, 0.4, 1, 0.9, 1, 1, 1] }}
               transition={{
-                delay: 3, // wait for 3s initial sequence
+                delay: 3,
                 duration: 5,
                 repeat: Infinity,
                 repeatType: "mirror",
                 ease: "linear",
                 times: [0, 0.1, 0.2, 0.25, 0.3, 0.5, 0.6, 0.8, 1]
               }}
-              className="flex flex-col items-center relative z-10"
+              className="flex flex-col items-center relative"
             >
               <h1 
                 className="text-7xl md:text-9xl lg:text-[11rem] font-normal text-white mb-2"
