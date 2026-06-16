@@ -235,8 +235,8 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             ))}
           </motion.div>
 
-          {/* Layer 2: Neon Sign Container with Glitch */}
-          <div className="relative flex flex-col items-center glitch-y-anim" style={{ width: 800, height: 400 }}>
+          {/* Layer 2: Neon Sign Container */}
+          <div className="relative flex flex-col items-center" style={{ width: 800, height: 400 }}>
             
             {/* Layer 2.1: White Core */}
             <motion.div
