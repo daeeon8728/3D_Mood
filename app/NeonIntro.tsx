@@ -26,8 +26,8 @@ function Spark({ xOffset, yDrop, delay, duration, size, color }: any) {
         backgroundColor: "#fff",
         boxShadow: `0 0 6px 2px ${color}`,
         mixBlendMode: "screen",
-        left: "calc(50% + 180px)",
-        top: "calc(50% + 10px)",
+        left: "calc(50% + 225px)",
+        top: "calc(50% - 15px)",
         zIndex: 5, 
       }}
       initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
@@ -56,13 +56,15 @@ function BackgroundWires() {
       style={{ zIndex: 1, opacity: 0.9 }}
       preserveAspectRatio="none"
     >
-      <defs>
-        <filter id="wire-glow">
-          {/* Faint blue emissive glow on the wire edges */}
-          <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#1A1A3F" floodOpacity="1"/>
-        </filter>
-      </defs>
-      <g filter="url(#wire-glow)" stroke="#050505" strokeWidth="6" fill="none" strokeLinecap="round">
+      {/* Base Wire (Dark core for silhouette) */}
+      <g stroke="#050505" strokeWidth="6" fill="none" strokeLinecap="round">
+        <path d="M 30% -10% Q 35% 30% 45% 48%" />
+        <path d="M 45% 48% Q 50% 55% 55% 52%" strokeWidth="4" />
+        <path d="M 55% 52% Q 58% 65% 55% 62%" strokeWidth="3" />
+        <path d="M 55% 62% Q 65% 70% 80% 110%" strokeWidth="5" />
+      </g>
+      {/* Emissive surface on the wire (no drop shadow) */}
+      <g stroke="#1A1A3F" strokeWidth="6" fill="none" strokeLinecap="round" style={{ opacity: 0.1 }}>
         <path d="M 30% -10% Q 35% 30% 45% 48%" />
         <path d="M 45% 48% Q 50% 55% 55% 52%" strokeWidth="4" />
         <path d="M 55% 52% Q 58% 65% 55% 62%" strokeWidth="3" />
@@ -128,11 +130,14 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
     animate: {
       opacity: opacities,
       color: opacities.map((o) => (o === 1 ? "#fff" : "#111")),
-      // Include random voltage jitter directly into the textShadow when it's ON
+      // Include random voltage jitter directly into the textShadow
       textShadow: opacities.map((o) => {
-        if (o !== 1) return "none";
-        const jitterX = (Math.random() - 0.5) * 6;
-        const jitterY = (Math.random() - 0.5) * 6;
+        const jitterX = (Math.random() - 0.5) * 8;
+        const jitterY = (Math.random() - 0.5) * 8;
+        if (o !== 1) {
+          // When flickering/off, keep a faint, jittery pink outline to show unstable voltage
+          return `${jitterX}px ${jitterY}px 5px rgba(255,42,133,0.5)`;
+        }
         return `
           0 0 2px #fff,
           0 0 4px #fff,
@@ -177,23 +182,23 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
           `}} />
 
-          {/* Layer 0: Concrete Texture */}
-          <div className="absolute inset-0 opacity-[0.25] pointer-events-none mix-blend-overlay" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-            zIndex: 0,
-          }}></div>
-
-          {/* Layer 1.5: Wall Light Map (Glow interacting with the physical wall) */}
+          {/* Layer 0: Wall Light Map (Glow under the concrete texture) */}
           <motion.div
             animate={{ opacity: opacities }}
             transition={{ duration: 3, times: times, ease: "linear" }}
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] pointer-events-none blur-[80px]"
             style={{
-              background: "radial-gradient(ellipse at center, rgba(255,42,133,0.18) 0%, rgba(0,212,255,0.06) 50%, transparent 70%)",
-              zIndex: 1,
+              background: "radial-gradient(ellipse at center, rgba(255,42,133,0.3) 0%, rgba(0,212,255,0.1) 50%, transparent 70%)",
+              zIndex: 0,
               mixBlendMode: "screen",
             }}
           />
+
+          {/* Layer 1: Concrete Texture (Overlays on top of the light map) */}
+          <div className="absolute inset-0 opacity-[0.3] pointer-events-none mix-blend-overlay" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+            zIndex: 1,
+          }}></div>
 
           {/* Layer 1: Background Wiring */}
           <BackgroundWires />
