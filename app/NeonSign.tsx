@@ -50,8 +50,10 @@ function Spark({ xOffset, yDrop, delay, duration, size }: any) {
 // ─── Spark particle ───────────────────────────────────────────────────────────
 
 // ─── Mechanical Lever ─────────────────────────────────────────────────────────
-const SLOT_H  = 133; // 2/3 of original 200px
-const SNAP_AT = SLOT_H * 0.8;
+const SLOT_H      = 133; // 2/3 of original 200px
+const HANDLE_SIZE = 27;
+const MAX_TRAVEL  = SLOT_H - HANDLE_SIZE;
+const SNAP_AT     = MAX_TRAVEL * 0.8;
 
 interface LeverProps {
   onSnap: () => void;
@@ -71,7 +73,7 @@ function MechanicalLever({ onSnap }: LeverProps) {
       setSnapped(true);
       // Spring-snap to bottom
       controls.start({
-        y: SLOT_H,
+        y: MAX_TRAVEL,
         transition: { type: "spring", stiffness: 300, damping: 20 },
       });
       onSnap();
@@ -112,7 +114,7 @@ function MechanicalLever({ onSnap }: LeverProps) {
         {/* Lever handle */}
         <motion.div
           drag={snapped ? false : "y"}
-          dragConstraints={{ top: 0, bottom: SLOT_H }}
+          dragConstraints={{ top: 0, bottom: MAX_TRAVEL }}
           dragElastic={0.05}
           dragMomentum={false}
           style={{ y: leverY, x: 0, position: "absolute", top: 0, left: "50%", translateX: "-50%", zIndex: 10, touchAction: "none", transform: "translateX(-50%)" }}
