@@ -48,31 +48,33 @@ function Spark({ xOffset, yDrop, delay, duration, size, color }: any) {
   );
 }
 
-// Layer 1: Background Wires with junction dots
+// Layer 1: Background Wires physically connected to text endpoints
 function BackgroundWires() {
   return (
-    <svg 
-      className="absolute inset-0 w-full h-full pointer-events-none" 
-      style={{ 
-        zIndex: 1, 
-        filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.2))' 
-      }}
-      preserveAspectRatio="none"
-    >
-      {/* Base Wire */}
-      <g stroke="#1a1a1a" strokeWidth="2" fill="none" strokeLinecap="round">
-        <path d="M 30% -10% Q 35% 30% 45% 48%" />
-        <path d="M 45% 48% Q 50% 55% 55% 52%" />
-        <path d="M 55% 52% Q 58% 65% 55% 62%" />
-        <path d="M 55% 62% Q 65% 70% 80% 110%" />
-      </g>
-      {/* Glowing junction dots where wire meets the text layer */}
-      <g fill="#fff" style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.8))' }}>
-        <circle cx="45%" cy="48%" r="3" />
-        <circle cx="55%" cy="52%" r="2" />
-        <circle cx="55%" cy="62%" r="3" />
-      </g>
-    </svg>
+    <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ zIndex: 1 }}>
+      <svg 
+        style={{ width: 0, height: 0, overflow: 'visible', filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.2))' }}
+      >
+        {/* Base Wire: dark cord */}
+        <g stroke="#1a1a1a" strokeWidth="3" fill="none" strokeLinecap="round">
+          {/* Wire 1: From W top-left up to the ceiling */}
+          <path d="M -230 -20 Q -280 -200 -200 -600" />
+          {/* Wire 2: From e bottom-right down to the floor */}
+          <path d="M 225 -15 Q 260 200 150 600" />
+        </g>
+        
+        {/* Metal Clips at the connection points */}
+        <g fill="#777" stroke="#111" strokeWidth="1">
+          {/* Clip at W (-230, -20) */}
+          <rect x="-234" y="-24" width="8" height="12" rx="2" transform="rotate(-15, -230, -20)" />
+          <circle cx="-230" cy="-20" r="1.5" fill="#111" />
+
+          {/* Clip at e (225, -15) */}
+          <rect x="221" y="-19" width="8" height="12" rx="2" transform="rotate(15, 225, -15)" />
+          <circle cx="225" cy="-15" r="1.5" fill="#111" />
+        </g>
+      </svg>
+    </div>
   );
 }
 
@@ -165,13 +167,25 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
         >
           <style dangerouslySetInnerHTML={{__html: `
             @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Dancing+Script:wght@400;700&display=swap');
+            @keyframes glitch-y {
+              0% { transform: translateY(0px); }
+              20% { transform: translateY(-1px); }
+              40% { transform: translateY(1px); }
+              60% { transform: translateY(-0.5px); }
+              80% { transform: translateY(0.5px); }
+              100% { transform: translateY(0px); }
+            }
+            .glitch-y-anim {
+              animation: glitch-y 0.1s infinite linear;
+            }
           `}} />
 
-          {/* Layer 0: Concrete Texture Interacting with Neon */}
+          {/* Layer 0: Concrete Texture Interacting with Neon (Brighten 5% when on) */}
           <motion.div 
             className="absolute inset-0 pointer-events-none"
             animate={{ 
-              backgroundColor: opacities.map(o => o === 1 ? 'rgba(50,20,30,0.4)' : 'rgba(10,10,10,0.9)') 
+              backgroundColor: opacities.map(o => o === 1 ? 'rgba(50,20,30,0.4)' : 'rgba(10,10,10,0.9)'),
+              filter: opacities.map(o => o === 1 ? 'contrast(120%) brightness(85%)' : 'contrast(120%) brightness(80%)')
             }}
             transition={{ duration: 3, times: times, ease: "linear" }}
             style={{
@@ -179,7 +193,6 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
               backgroundBlendMode: 'overlay',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              filter: 'contrast(120%) brightness(80%)',
               zIndex: 0,
             }}
           />
@@ -191,6 +204,18 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] pointer-events-none blur-[80px]"
             style={{
               background: "radial-gradient(ellipse at center, rgba(255,42,133,0.3) 0%, rgba(0,212,255,0.1) 50%, transparent 70%)",
+              zIndex: 0,
+              mixBlendMode: "screen",
+            }}
+          />
+
+          {/* Layer 0.6: Floor / Wall Light Spill (Elongated glow below the text) */}
+          <motion.div
+            animate={{ opacity: opacities }}
+            transition={{ duration: 3, times: times, ease: "linear" }}
+            className="absolute left-1/2 top-[55%] -translate-x-1/2 w-[1200px] h-[300px] pointer-events-none blur-[70px]"
+            style={{
+              background: "radial-gradient(ellipse at top, rgba(255,42,133,0.15) 0%, rgba(0,212,255,0.05) 50%, transparent 70%)",
               zIndex: 0,
               mixBlendMode: "screen",
             }}
@@ -210,8 +235,8 @@ export default function NeonIntro({ onExplore }: { onExplore: () => void }) {
             ))}
           </motion.div>
 
-          {/* Layer 2: Neon Sign Container */}
-          <div className="relative flex flex-col items-center" style={{ width: 800, height: 400 }}>
+          {/* Layer 2: Neon Sign Container with Glitch */}
+          <div className="relative flex flex-col items-center glitch-y-anim" style={{ width: 800, height: 400 }}>
             
             {/* Layer 2.1: White Core */}
             <motion.div
