@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { motion, AnimatePresence, useMotionValue, useAnimation, animate } from "framer-motion";
+import React, { useState, useMemo, useRef, useCallback } from "react";
+import { motion, AnimatePresence, useMotionValue, useAnimation, type Transition, type Variants } from "framer-motion";
 
 // ─── Spark particle ───────────────────────────────────────────────────────────
 const generateSparks = (count: number) =>
@@ -317,12 +317,13 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
     return stableGlow;
   });
 
-  const exitVariant = {
+  const exitTransition: Transition = { duration: 1.0, ease: "easeOut" as const };
+  const exitVariant: Variants = {
     exit: {
       opacity: 0,
       scale: 1.04,
       filter: "blur(18px)",
-      transition: { duration: 1.0, ease: "easeOut" },
+      transition: exitTransition,
     },
   };
 
