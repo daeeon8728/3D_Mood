@@ -2,357 +2,440 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  ThreeDCanvas.tsx
-//  Fully independent 3D intro layer.
-//  No 2D HTML elements. Everything is a Three.js mesh / material / primitive.
-//  Sequence: flicker → idle (mouse tilt + sparkles) → explosion → fade out
+//  ThreeDCanvas.tsx  —  Cinematic Neon Intro
+//
+//  Stack:  React Three Fiber · Drei · Three.js · Framer Motion (fade only)
+//  Sequence:
+//    1. Neon sign flickers ON (useFrame — no framer-motion)
+//    2. Mouse-driven tilt of the whole scene
+//    3. Sparkles float around the letters
+//    4. Click → per-letter explosion physics → black fade → main app
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as THREE from "three";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
-  Environment,
+  OrthographicCamera,
   Text3D,
   Center,
   MeshTransmissionMaterial,
   Sparkles,
-  PresentationControls,
 } from "@react-three/drei";
 
-const FONT_URL =
-  "https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
+// ── Font ─────────────────────────────────────────────────────────────────────
+const FONT = "https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
 
-// ─── Per-letter physics atom ──────────────────────────────────────────────────
-function CinematicLetter({
+// ─────────────────────────────────────────────────────────────────────────────
+//  NeonLetter: one glyph — owns its flicker timer & explosion physics
+// ─────────────────────────────────────────────────────────────────────────────
+function NeonLetter({
   char,
-  index,
-  totalLetters,
+  offsetX,
+  neonColor,
   phase,
-  flickerOn,
+  size = 1.6,
+  height = 0.45,
 }: {
   char: string;
-  index: number;
-  totalLetters: number;
+  offsetX: number;
+  neonColor: string;
   phase: "idle" | "exploding";
-  flickerOn: boolean;
+  size?: number;
+  height?: number;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const meshRef   = useRef<THREE.Mesh>(null);
+  const matRef    = useRef<THREE.MeshPhysicalMaterial>(null);
+  const ftimer    = useRef(0);          // flicker timer
+  const stable    = useRef(false);      // true once the initial flicker-ON is done
 
-  // Stable random physics vectors per letter
+  // ── Stable physics vectors (memo = computed once, never re-computed)
   const vel = useMemo(
     () =>
       new THREE.Vector3(
-        (Math.random() - 0.5) * 38,
-        (Math.random() + 0.25) * 28,   // bias upward so letters burst outward
-        (Math.random() - 0.5) * 42
+        (Math.random() - 0.5) * 32,
+        (Math.random() + 0.4) * 22,
+        (Math.random() - 0.5) * 18
       ),
     []
   );
-  const rotSpd = useMemo(
+  const angVel = useMemo(
     () =>
       new THREE.Vector3(
-        (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 20,
-        (Math.random() - 0.5) * 20
+        (Math.random() - 0.5) * 14,
+        (Math.random() - 0.5) * 14,
+        (Math.random() - 0.5) * 14
       ),
     []
   );
 
-  useFrame((_s, dt) => {
+  // ── elapsed time ref for the opening flicker-on sequence
+  const elapsed = useRef(0);
+
+  useFrame((_state, dt) => {
+    // ① Explosion physics — letters fly away
     if (phase === "exploding" && meshRef.current) {
       meshRef.current.position.addScaledVector(vel, dt);
-      meshRef.current.rotation.x += rotSpd.x * dt;
-      meshRef.current.rotation.y += rotSpd.y * dt;
-      meshRef.current.rotation.z += rotSpd.z * dt;
+      meshRef.current.rotation.x += angVel.x * dt;
+      meshRef.current.rotation.y += angVel.y * dt;
+      meshRef.current.rotation.z += angVel.z * dt;
+      if (matRef.current) matRef.current.opacity = Math.max(0, matRef.current.opacity - dt * 1.8);
+      return;
+    }
+
+    if (!matRef.current) return;
+
+    // ② Opening flicker sequence: 3 s exponentially accelerating
+    if (!stable.current) {
+      elapsed.current += dt;
+      const progress  = Math.min(elapsed.current / 3.0, 1.0);
+      ftimer.current += dt;
+      // interval shrinks: 0.45 s → 0.018 s
+      const interval = 0.45 * Math.pow(0.04, progress);
+
+      if (ftimer.current >= interval) {
+        ftimer.current = 0;
+        if (progress < 1.0) {
+          // Toggle visible / invisible to simulate neon striking
+          matRef.current.emissiveIntensity =
+            matRef.current.emissiveIntensity > 0.2 ? 0.02 : 0.6 + Math.random() * 0.8;
+        } else {
+          // Fully ON — switch to idle flicker mode
+          stable.current = true;
+          matRef.current.emissiveIntensity = 1.0;
+        }
+      }
+      return;
+    }
+
+    // ③ Idle flicker: subtle random noise like a real neon tube
+    ftimer.current += dt;
+    // Fire at random intervals roughly every 40–120 ms
+    if (ftimer.current > 0.04 + Math.random() * 0.08) {
+      ftimer.current = 0;
+      const r = Math.random();
+      if (r < 0.03) {
+        // Rare full blackout — broken tube moment
+        matRef.current.emissiveIntensity = 0.0;
+      } else if (r < 0.12) {
+        // Brief dim flicker
+        matRef.current.emissiveIntensity = 0.25 + Math.random() * 0.35;
+      } else {
+        // Normal bright with slight noise
+        matRef.current.emissiveIntensity = 0.8 + Math.random() * 0.6;
+      }
     }
   });
 
-  const offsetX = (index - (totalLetters - 1) / 2) * 2.55;
-
   return (
-    <group position={[offsetX, 0, 0]} visible={flickerOn}>
+    <group position={[offsetX, 0, 0]}>
       <Text3D
         ref={meshRef as any}
-        font={FONT_URL}
-        size={2.0}
-        height={0.9}
+        font={FONT}
+        size={size}
+        height={height}
         curveSegments={32}
         bevelEnabled
-        bevelThickness={0.08}
-        bevelSize={0.05}
+        bevelThickness={0.05}
+        bevelSize={0.035}
         bevelOffset={0}
-        bevelSegments={14}
+        bevelSegments={12}
         castShadow
-        receiveShadow
       >
         {char}
-        {/* Frosted glass — physically-based refraction */}
         <MeshTransmissionMaterial
-          background={new THREE.Color("#000000")}
-          transmission={0.85}
-          roughness={0.15}
-          thickness={0.55}
-          chromaticAberration={0.07}
-          ior={1.65}
+          ref={matRef as any}
+          background={new THREE.Color("#060606")}
+          transmission={0.78}
+          roughness={0.06}
+          thickness={0.45}
+          chromaticAberration={0.1}
+          ior={1.75}
           clearcoat={1.0}
-          clearcoatRoughness={0.04}
-          envMapIntensity={1.8}
+          clearcoatRoughness={0.02}
+          emissive={neonColor}
+          emissiveIntensity={0.02}   // starts dark; useFrame ramps it up
+          transparent
+          opacity={1}
+          envMapIntensity={0.3}
         />
       </Text3D>
     </group>
   );
 }
 
-// ─── Explore button — pure 3-D mesh ─────────────────────────────────────────
-function ExploreBtn({
-  onExploreClick,
-}: {
-  onExploreClick: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const groupRef = useRef<THREE.Group>(null);
+// ─────────────────────────────────────────────────────────────────────────────
+//  NeonSubtitle: single-mesh subtitle with its own idle flicker
+// ─────────────────────────────────────────────────────────────────────────────
+function NeonSubtitle({ phase }: { phase: "idle" | "exploding" }) {
+  const matRef = useRef<THREE.MeshPhysicalMaterial>(null);
+  const ftimer = useRef(0);
+  const stable = useRef(false);
+  const elapsed = useRef(0);
 
-  useFrame(() => {
-    if (groupRef.current) {
-      const target = -4.6 + Math.sin(Date.now() * 0.0018) * 0.2;
-      groupRef.current.position.y = THREE.MathUtils.lerp(
-        groupRef.current.position.y,
-        target,
-        0.06
-      );
-      const ts = hovered ? 1.1 : 1.0;
-      groupRef.current.scale.setScalar(
-        THREE.MathUtils.lerp(groupRef.current.scale.x, ts, 0.1)
-      );
+  useFrame((_s, dt) => {
+    if (!matRef.current) return;
+    if (phase === "exploding") {
+      matRef.current.opacity = Math.max(0, matRef.current.opacity - dt * 3);
+      return;
+    }
+
+    if (!stable.current) {
+      elapsed.current += dt;
+      const progress = Math.min(elapsed.current / 3.0, 1.0);
+      ftimer.current += dt;
+      const interval = 0.5 * Math.pow(0.04, progress);
+      if (ftimer.current >= interval) {
+        ftimer.current = 0;
+        if (progress < 1.0) {
+          matRef.current.emissiveIntensity =
+            matRef.current.emissiveIntensity > 0.2 ? 0.02 : 0.5 + Math.random() * 0.7;
+        } else {
+          stable.current = true;
+          matRef.current.emissiveIntensity = 0.9;
+        }
+      }
+      return;
+    }
+
+    ftimer.current += dt;
+    if (ftimer.current > 0.05 + Math.random() * 0.1) {
+      ftimer.current = 0;
+      const r = Math.random();
+      if (r < 0.03) matRef.current.emissiveIntensity = 0.0;
+      else if (r < 0.1) matRef.current.emissiveIntensity = 0.2 + Math.random() * 0.3;
+      else matRef.current.emissiveIntensity = 0.7 + Math.random() * 0.5;
     }
   });
 
   return (
-    <group ref={groupRef} position={[0, -4.6, 0]}>
-      {/* Capsule body */}
-      <mesh
-        rotation={[0, 0, Math.PI / 2]}
-        onPointerOver={() => {
-          setHovered(true);
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          document.body.style.cursor = "default";
-        }}
-        onClick={() => {
-          document.body.style.cursor = "default";
-          onExploreClick();
-        }}
+    <Center position={[0, -2.2, 0]}>
+      <Text3D
+        font={FONT}
+        size={0.52}
+        height={0.16}
+        curveSegments={24}
+        bevelEnabled
+        bevelThickness={0.02}
+        bevelSize={0.012}
+        bevelSegments={8}
       >
-        <capsuleGeometry args={[0.62, 3.5, 16, 32]} />
+        made by daeeon
         <MeshTransmissionMaterial
-          transmission={0.9}
-          roughness={0.1}
-          thickness={0.35}
+          ref={matRef as any}
+          background={new THREE.Color("#060606")}
+          transmission={0.72}
+          roughness={0.08}
+          thickness={0.3}
+          chromaticAberration={0.07}
+          ior={1.65}
           clearcoat={1}
-          chromaticAberration={0.04}
-        />
-      </mesh>
-
-      {/* Wireframe glow rim */}
-      <mesh rotation={[0, 0, Math.PI / 2]}>
-        <capsuleGeometry args={[0.645, 3.52, 16, 32]} />
-        <meshBasicMaterial
-          color={hovered ? "#ff2a85" : "#4a90e2"}
-          wireframe
+          clearcoatRoughness={0.03}
+          emissive="#00d4ff"
+          emissiveIntensity={0.02}
           transparent
-          opacity={hovered ? 0.6 : 0.2}
+          opacity={1}
+          envMapIntensity={0.3}
         />
-      </mesh>
-
-      {/* EXPLORE label — 3D text, NOT HTML */}
-      <group position={[0, 0, 0.65]}>
-        <Center>
-          <Text3D font={FONT_URL} size={0.3} height={0.07} curveSegments={24}>
-            EXPLORE
-            <meshStandardMaterial
-              color={hovered ? "#ffffff" : "#cccccc"}
-              emissive={hovered ? "#ff2a85" : "#4a90e2"}
-              emissiveIntensity={hovered ? 2.0 : 1.0}
-            />
-          </Text3D>
-        </Center>
-      </group>
-    </group>
+      </Text3D>
+    </Center>
   );
 }
 
-// ─── Full scene (runs inside <Canvas>) ───────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  HintText: "CLICK TO ENTER" — purely 3D, no HTML
+// ─────────────────────────────────────────────────────────────────────────────
+function HintText({ phase }: { phase: "idle" | "exploding" }) {
+  const matRef  = useRef<THREE.MeshStandardMaterial>(null);
+  const opTimer = useRef(0);
+
+  useFrame((_s, dt) => {
+    if (!matRef.current) return;
+    opTimer.current += dt;
+    // Pulse opacity slowly
+    matRef.current.opacity = 0.2 + Math.abs(Math.sin(opTimer.current * 0.9)) * 0.25;
+    if (phase === "exploding") matRef.current.opacity = 0;
+  });
+
+  return (
+    <Center position={[0, -3.8, 0]}>
+      <Text3D
+        font={FONT}
+        size={0.22}
+        height={0.04}
+        curveSegments={12}
+      >
+        CLICK TO ENTER
+        <meshStandardMaterial
+          ref={matRef as any}
+          color="#ffffff"
+          transparent
+          opacity={0.2}
+        />
+      </Text3D>
+    </Center>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Scene: lights + all objects + mouse tilt
+// ─────────────────────────────────────────────────────────────────────────────
 function Scene({
   phase,
-  flickerOn,
-  showExplore,
-  onExploreClick,
+  onExplode,
 }: {
   phase: "idle" | "exploding";
-  flickerOn: boolean;
-  showExplore: boolean;
-  onExploreClick: () => void;
+  onExplode: () => void;
 }) {
-  const letters = "WELCOME".split("");
-  const scaleRef = useRef<THREE.Group>(null);
-  const [hovered, setHovered] = useState(false);
+  const groupRef = useRef<THREE.Group>(null);
+  const { mouse } = useThree();
 
+  const WELCOME  = "WELCOME".split("");
+  const SPACING  = 2.35;
+  const halfSpan = ((WELCOME.length - 1) / 2) * SPACING;
+
+  // ── Smooth mouse-driven tilt of the entire scene group
   useFrame(() => {
-    if (scaleRef.current && phase === "idle") {
-      const t = hovered ? 1.06 : 1.0;
-      scaleRef.current.scale.setScalar(
-        THREE.MathUtils.lerp(scaleRef.current.scale.x, t, 0.08)
-      );
-    }
+    if (!groupRef.current || phase === "exploding") return;
+    groupRef.current.rotation.y = THREE.MathUtils.lerp(
+      groupRef.current.rotation.y,
+      mouse.x * 0.28,
+      0.04
+    );
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(
+      groupRef.current.rotation.x,
+      -mouse.y * 0.14,
+      0.04
+    );
   });
 
   return (
     <>
       {/* ── Background */}
-      <color attach="background" args={["#000000"]} />
+      <color attach="background" args={["#060606"]} />
 
-      {/* ── Environment map (city reflections on glass) */}
-      <Environment preset="city" />
+      {/* ── Lighting: side + low-angle spotlights ONLY (no top-down) */}
 
-      {/* ── Lighting: SIDE & LOW-ANGLE ONLY — no top-down lights */}
-      {/* Left flank — warm magenta */}
-      <pointLight position={[-15, 1, 5]} intensity={700} color="#ff2a85" />
-      {/* Right flank — electric blue */}
-      <pointLight position={[15, 1, 5]}  intensity={600} color="#4a90e2" />
-      {/* Front-left key at ≈15° above horizontal */}
-      <directionalLight
-        position={[-12, 3, 9]}
-        intensity={2.2}
-        color="#e8eeff"
+      {/* Pink spot — bottom-left, raking the geometry */}
+      <spotLight
+        position={[-10, -3, 8]}
+        target-position={[0, 0, 0]}
+        angle={0.4}
+        penumbra={0.85}
+        intensity={180}
+        color="#ff2a85"
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
       />
-      {/* Subtle ground bounce */}
-      <pointLight position={[0, -7, 3]} intensity={250} color="#4a90e2" />
+      {/* Cyan spot — bottom-right */}
+      <spotLight
+        position={[10, -3, 8]}
+        target-position={[0, 0, 0]}
+        angle={0.4}
+        penumbra={0.85}
+        intensity={150}
+        color="#00d4ff"
+        castShadow
+      />
+      {/* Very dim back rim — gives depth to bevel edges */}
+      <pointLight position={[0, 4, -5]} intensity={25} color="#ffffff" />
+      {/* Barely-visible fill to avoid total blackness in shadows */}
+      <ambientLight intensity={0.04} />
 
-      {/* ── Shadow-catcher floor (invisible plane that only receives shadows) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3.2, 0]} receiveShadow>
-        <planeGeometry args={[140, 140]} />
-        <shadowMaterial transparent opacity={0.5} />
+      {/* ── Shadow catcher */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
+        <planeGeometry args={[100, 100]} />
+        <shadowMaterial transparent opacity={0.35} />
       </mesh>
 
-      {/* ── Sparkle particles */}
-      <Sparkles
-        count={80}
-        size={3.8}
-        speed={0.38}
-        opacity={0.95}
-        scale={20}
-        color="#ffffff"
-      />
+      {/* ── Sparkles (white dust + pink neon + cyan neon) */}
+      <Sparkles count={80} size={4}   speed={0.45} opacity={0.9}  scale={[28, 10, 8]} color="#ffffff" />
+      <Sparkles count={35} size={3.5} speed={0.3}  opacity={0.85} scale={[22,  7, 5]} color="#ff2a85" position={[0, 1.5, 0]} />
+      <Sparkles count={25} size={3}   speed={0.3}  opacity={0.8}  scale={[18,  5, 4]} color="#00d4ff" position={[0, -2, 0]} />
 
-      {/* ── WELCOME letters inside PresentationControls for mouse tilt */}
-      <PresentationControls
-        global
-        polar={[-0.13, 0.13]}
-        azimuth={[-0.28, 0.28]}
-        snap
-      >
-        <group
-          ref={scaleRef}
-          position={[0, 1.3, 0]}
-          onPointerOver={() => setHovered(true)}
-          onPointerOut={() => setHovered(false)}
-        >
-          {letters.map((ch, i) => (
-            <CinematicLetter
+      {/* ── Interactive group (tilt driven by mouse) */}
+      <group ref={groupRef}>
+        {/* WELCOME — per-letter for individual explosion */}
+        <group position={[0, 1.6, 0]}>
+          {WELCOME.map((ch, i) => (
+            <NeonLetter
               key={i}
               char={ch}
-              index={i}
-              totalLetters={letters.length}
+              offsetX={(i - (WELCOME.length - 1) / 2) * SPACING}
+              neonColor="#ff2a85"
               phase={phase}
-              flickerOn={flickerOn}
+              size={1.6}
+              height={0.45}
             />
           ))}
         </group>
-      </PresentationControls>
 
-      {/* ── Explore button — visible only after flicker ends, not during explosion */}
-      {showExplore && phase === "idle" && (
-        <ExploreBtn onExploreClick={onExploreClick} />
+        {/* Subtitle */}
+        <NeonSubtitle phase={phase} />
+
+        {/* Hint */}
+        <HintText phase={phase} />
+      </group>
+
+      {/* ── Invisible click-catcher plane (covers entire viewport) */}
+      {phase === "idle" && (
+        <mesh
+          position={[0, 0, 2]}
+          onClick={onExplode}
+          onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+          onPointerOut={() =>  { document.body.style.cursor = "default"; }}
+        >
+          <planeGeometry args={[200, 200]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
       )}
     </>
   );
 }
 
-// ─── Public component — drop this into page.tsx ──────────────────────────────
-export default function ThreeDCanvas({
-  onExplore,
-}: {
-  onExplore: () => void;
-}) {
-  const [flickerOn, setFlickerOn]     = useState(false);
-  const [phase, setPhase]             = useState<"idle" | "exploding">("idle");
-  const [showExplore, setShowExplore] = useState(false);
-  const [fadeOut, setFadeOut]         = useState(false);
+// ─────────────────────────────────────────────────────────────────────────────
+//  ThreeDCanvas — public component, drop into page.tsx
+// ─────────────────────────────────────────────────────────────────────────────
+export default function ThreeDCanvas({ onExplore }: { onExplore: () => void }) {
+  const [phase,   setPhase]   = useState<"idle" | "exploding">("idle");
+  const [fadeOut, setFadeOut] = useState(false);
 
-  // ── 1. Exponential flicker: 3 s, accelerating toggle, then stays ON
-  useEffect(() => {
-    let id: NodeJS.Timeout;
-    const start    = Date.now();
-    const DURATION = 3000;
-
-    const tick = () => {
-      const elapsed  = Date.now() - start;
-      if (elapsed >= DURATION) {
-        setFlickerOn(true);
-        setShowExplore(true);
-        return;
-      }
-      const progress = elapsed / DURATION;
-      // interval: 450 ms → 22 ms (quadratic ease)
-      const interval = THREE.MathUtils.lerp(450, 22, progress * progress);
-      setFlickerOn((p) => !p);
-      id = setTimeout(tick, interval);
-    };
-
-    id = setTimeout(tick, 450);
-    return () => clearTimeout(id);
-  }, []);
-
-  // ── 2. Explosion sequence
-  const handleExploreClick = () => {
+  const handleExplode = () => {
     setPhase("exploding");
-    setTimeout(() => setFadeOut(true), 850);
-    setTimeout(() => onExplore(),     1450);
+    // Start fade-to-black after letters have had time to scatter
+    setTimeout(() => setFadeOut(true),  700);
+    // Hand off to parent after fade completes
+    setTimeout(() => onExplore(),       1350);
   };
 
   return (
-    <motion.div
-      className="fixed inset-0 z-[100]"
-      style={{ background: "#000" }}
-      exit={{ opacity: 0, transition: { duration: 0.6, ease: "easeInOut" } }}
-    >
-      <Canvas camera={{ position: [0, 0, 20], fov: 44 }} dpr={[1, 2]} shadows>
-        <Scene
-          phase={phase}
-          flickerOn={flickerOn}
-          showExplore={showExplore}
-          onExploreClick={handleExploreClick}
-        />
+    // Full-screen fixed layer — sits above the main app until onExplore is called
+    <div className="fixed inset-0 z-[100]" style={{ background: "#060606" }}>
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.4 }}
+      >
+        {/* Orthographic camera — flat front view like a product/art shot */}
+        <OrthographicCamera makeDefault position={[0, 0, 10]} zoom={60} near={0.1} far={100} />
+
+        <Scene phase={phase} onExplode={handleExplode} />
       </Canvas>
 
-      {/* ── Cinematic black-out overlay */}
+      {/* ── Cinematic black-out overlay (framer-motion is fine for a 2D div overlay) */}
       <AnimatePresence>
         {fadeOut && (
           <motion.div
-            className="absolute inset-0 bg-black z-50 pointer-events-none"
+            className="absolute inset-0 bg-black pointer-events-none"
+            style={{ zIndex: 200 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
           />
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
