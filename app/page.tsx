@@ -1426,7 +1426,7 @@ function CriticPopover({ popover, onClose, onSubmit }:
 function NeonIntro({ onExplore }: { onExplore: () => void }) {
   const [clicked, setClicked] = useState(false);
 
-  const flickerVariants = {
+  const flickerVariants: any = {
     initial: { opacity: 0, textShadow: "none" },
     animate: {
       opacity: [0, 1, 0.3, 1, 0, 1, 0.8, 1],
