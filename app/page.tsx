@@ -10,6 +10,9 @@ import React, {
   useState, useEffect, useRef, useCallback,
 } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
+import * as THREE from 'three';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Environment, Text3D, Center } from '@react-three/drei';
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 
@@ -1418,111 +1421,186 @@ function CriticPopover({ popover, onClose, onSubmit }:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  CINEMATIC ENTRANCE
+//  3D CINEMATIC ENTRANCE
 // ─────────────────────────────────────────────────────────────────────────────
-function CinematicEntrance({ onExplore }: { onExplore: () => void }) {
+const FONT_URL = "https://threejs.org/examples/fonts/helvetiker_bold.typeface.json";
+
+function InteractiveText() {
+  const groupRef = useRef<THREE.Group>(null);
+  const { mouse } = useThree();
+  const letters = "WELCOME".split("");
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const expansion = Math.abs(mouse.x) * 1.5;
+    
+    groupRef.current.children.forEach((child, i) => {
+      const offsetFromCenter = i - 3;
+      const targetX = offsetFromCenter * (1.2 + expansion);
+      child.position.x = THREE.MathUtils.lerp(child.position.x, targetX, 0.1);
+      
+      const targetZ = Math.sin(Date.now() * 0.002 + i) * 0.2;
+      child.position.z = THREE.MathUtils.lerp(child.position.z, targetZ, 0.1);
+      
+      const targetRotY = mouse.x * 0.2 * offsetFromCenter;
+      child.rotation.y = THREE.MathUtils.lerp(child.rotation.y, targetRotY, 0.1);
+    });
+  });
+
+  return (
+    <group ref={groupRef} position={[0, 1, 0]}>
+      {letters.map((char, i) => (
+        <group key={i}>
+          <Center>
+            <Text3D
+              font={FONT_URL}
+              size={1.5}
+              height={0.4}
+              bevelEnabled
+              bevelThickness={0.03}
+              bevelSize={0.02}
+            >
+              {char}
+              <meshPhysicalMaterial 
+                color="#ffffff"
+                metalness={0.9} 
+                roughness={0.1} 
+                envMapIntensity={2.5}
+              />
+            </Text3D>
+          </Center>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function ExploreButton({ onClick, visible }: { onClick: () => void, visible: boolean }) {
+  const [hovered, setHovered] = useState(false);
+  const meshRef = useRef<THREE.Mesh>(null);
+  
+  useFrame(() => {
+    if (meshRef.current) {
+      const targetScale = hovered ? 1.05 : 1.0;
+      meshRef.current.scale.setScalar(THREE.MathUtils.lerp(meshRef.current.scale.x, targetScale, 0.1));
+    }
+  });
+
+  if (!visible) return null;
+
+  return (
+    <group position={[0, -2, 0]}>
+      <mesh 
+        ref={meshRef}
+        onPointerOver={() => { setHovered(true); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'default'; }}
+        onClick={() => { document.body.style.cursor = 'default'; onClick(); }}
+      >
+        <boxGeometry args={[4, 1.2, 0.2]} />
+        <meshPhysicalMaterial 
+          color={hovered ? "#ff2a85" : "#1a1a1a"} 
+          metalness={0.5} 
+          roughness={0.2}
+          emissive={hovered ? "#ff2a85" : "#000000"}
+          emissiveIntensity={hovered ? 0.5 : 0}
+        />
+      </mesh>
+      
+      <group position={[0, 0, 0.15]}>
+        <Center>
+          <Text3D font={FONT_URL} size={0.4} height={0.05}>
+            EXPLORE
+            <meshStandardMaterial color={hovered ? "#ffffff" : "#ff2a85"} />
+          </Text3D>
+        </Center>
+      </group>
+    </group>
+  );
+}
+
+function RippleOverlay({ active, onComplete }: { active: boolean; onComplete: () => void }) {
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+  const { viewport } = useThree();
+
+  useFrame((state, delta) => {
+    if (active && materialRef.current) {
+      materialRef.current.uniforms.uRadius.value += delta * 2.0; 
+      if (materialRef.current.uniforms.uRadius.value > 2.5) {
+        onComplete();
+      }
+    }
+  });
+
+  const uniforms = useRef({
+    uRadius: { value: 0.0 },
+    uColor: { value: new THREE.Color("#000000") },
+    uAspect: { value: viewport.width / viewport.height }
+  });
+
+  return (
+    <mesh position={[0, 0, 8]}>
+      <planeGeometry args={[viewport.width * 2, viewport.height * 2]} />
+      <shaderMaterial
+        ref={materialRef}
+        transparent={true}
+        depthWrite={false}
+        uniforms={uniforms.current}
+        vertexShader={`
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `}
+        fragmentShader={`
+          uniform float uRadius;
+          uniform vec3 uColor;
+          uniform float uAspect;
+          varying vec2 vUv;
+          void main() {
+            vec2 center = vec2(0.5);
+            vec2 st = vUv;
+            st.x *= uAspect;
+            center.x *= uAspect;
+            float dist = distance(st, center);
+            float inside = step(dist, uRadius);
+            gl_FragColor = vec4(uColor, inside);
+          }
+        `}
+      />
+    </mesh>
+  );
+}
+
+function ThreeDIntro({ onExplore }: { onExplore: () => void }) {
   const [showExplore, setShowExplore] = useState(false);
   const [rippleActive, setRippleActive] = useState(false);
-
-  // Motion values for typography interaction
-  const rawMouseX = useMotionValue(0);
-  const distanceX = useMotionValue(0);
-
-  // Springs for smooth movement
-  const smoothDistanceX = useSpring(distanceX, { stiffness: 100, damping: 20 });
-  const smoothRawX = useSpring(rawMouseX, { stiffness: 80, damping: 25 });
-
-  // Transforms
-  const gap = useTransform(smoothDistanceX, [0, 800], ["0px", "100px"]); 
-  const dotX = useTransform(smoothRawX, [-800, 800], ["-250px", "250px"]); 
 
   useEffect(() => {
     const timer = setTimeout(() => setShowExplore(true), 2000);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const centerX = window.innerWidth / 2;
-    const diffX = e.clientX - centerX;
-    rawMouseX.set(diffX);
-    distanceX.set(Math.abs(diffX));
-  };
-
   const handleExploreClick = () => {
     setRippleActive(true);
-    setTimeout(() => {
-      onExplore();
-    }, 1000);
   };
-
-  const letters = "WELCOME".split("");
 
   return (
     <motion.div
-      onMouseMove={handleMouseMove}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden"
+      className="fixed inset-0 z-[100] bg-black"
       exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
     >
-      <AnimatePresence>
-        {rippleActive && (
-          <motion.div
-            initial={{ scale: 0, opacity: 1 }}
-            animate={{ scale: 200, opacity: 1 }}
-            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute z-10 w-20 h-20 rounded-full"
-            style={{ 
-              background: "#000000", 
-              originX: "50%", 
-              originY: "50%" 
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <div className="relative z-20 flex flex-col items-center w-full">
-        {/* Minimalist Interactive Typography */}
-        <motion.div
-          animate={{ y: [-10, 10], x: [-5, 5] }}
-          transition={{ repeat: Infinity, repeatType: "reverse", duration: 4, ease: "easeInOut" }}
-          className="relative flex flex-col items-center justify-center w-full"
-        >
-          {/* Moving Yellow Dot (Climber) */}
-          <motion.div
-            className="absolute top-[-10px] w-2.5 h-2.5 rounded-full bg-yellow-400 z-10"
-            style={{ x: dotX }}
-          />
-
-          <motion.div 
-            className="flex items-center justify-center"
-            style={{ gap }}
-          >
-            {letters.map((letter, i) => (
-              <motion.span 
-                key={i} 
-                className="text-7xl md:text-[9rem] font-black tracking-tighter text-white select-none leading-none"
-              >
-                {letter}
-              </motion.span>
-            ))}
-          </motion.div>
-        </motion.div>
-
-        {/* Explore Button */}
-        <AnimatePresence>
-          {showExplore && (
-            <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              onClick={handleExploreClick}
-              className="mt-24 px-10 py-3 rounded-full border border-pink-500 text-pink-400 font-bold uppercase tracking-[0.2em] text-sm transition-all hover:bg-pink-500/10 hover:shadow-[0_0_25px_rgba(236,72,153,0.4)] active:scale-95"
-            >
-              Explore
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
+      <Canvas camera={{ position: [0, 0, 10], fov: 45 }}>
+        <color attach="background" args={["#000000"]} />
+        <Environment preset="city" />
+        <directionalLight position={[5, 5, 5]} intensity={1.5} color="#ffffff" />
+        <directionalLight position={[-5, 5, 5]} intensity={0.8} color="#4a90e2" />
+        
+        <InteractiveText />
+        <ExploreButton visible={showExplore} onClick={handleExploreClick} />
+        
+        <RippleOverlay active={rippleActive} onComplete={onExplore} />
+      </Canvas>
     </motion.div>
   );
 }
@@ -1612,7 +1690,7 @@ export default function ThreeDMoodApp() {
     <>
       <AnimatePresence>
         {!introCompleted && (
-          <CinematicEntrance key="intro" onExplore={() => setIntroCompleted(true)} />
+          <ThreeDIntro key="intro" onExplore={() => setIntroCompleted(true)} />
         )}
       </AnimatePresence>
 
