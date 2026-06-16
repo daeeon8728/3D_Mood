@@ -159,7 +159,7 @@ function MechanicalLever({ onSnap }: LeverProps) {
           dragConstraints={{ top: 0, bottom: SLOT_H }}
           dragElastic={0.05}
           dragMomentum={false}
-          style={{ y: leverY, x: 0, position: "absolute", top: 0, zIndex: 10, touchAction: "none" }}
+          style={{ y: leverY, x: 0, position: "absolute", top: 0, left: "50%", translateX: "-50%", zIndex: 10, touchAction: "none", transform: "translateX(-50%)" }}
           animate={controls}
           onDragEnd={handleDragEnd}
           whileDrag={{ scale: 1.05 }}
@@ -170,7 +170,7 @@ function MechanicalLever({ onSnap }: LeverProps) {
             style={{
               width: 40,
               height: 40,
-              marginLeft: -12,
+              marginLeft: 0,
               borderRadius: 8,
               background: snapped
                 ? "linear-gradient(135deg, #d4af37 0%, #8B6914 60%, #c9a227 100%)"
