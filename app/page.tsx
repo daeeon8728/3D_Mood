@@ -425,11 +425,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       ctx.fillStyle = "#030303";
       ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
 
-      // 2. Draw the 3D model WITH Brightness Filter!
-      const brightnessValue = 0.4 + (lighting.intensity / 100) * 1.0;
-      ctx.filter = `brightness(${brightnessValue})`;
+      // 2. Draw the 3D model directly without filters
       ctx.drawImage(webglCanvas, 0, 0);
-      ctx.filter = "none";
 
       // 3. Draw the CSS overlay mood lighting (Screen blend mode)
       const overlayAlpha = (lighting.intensity / 100) * 0.18;
@@ -487,30 +484,49 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   };
 
   // Derived CSS values from lighting state
-  const brightness  = (0.4 + (lighting.intensity / 100) * 1.0).toFixed(2);
   const overlayHex  = lighting.color;
   const overlayAlpha= Math.round((lighting.intensity / 100) * 0.18 * 255).toString(16).padStart(2,"0");
   const glowHex     = lighting.color;
   const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
 
-  // Material CSS Filters
-  let containerFilter = `brightness(${brightness})`;
-  let containerOpacity = 1;
-  let containerBackdrop = "none";
-  let containerBackground = "transparent";
-  let containerBorder = "none";
+  // Removed CSS filters completely to allow Spline 3D direct control
 
-  if (isStudioMode) {
-    if (materialMode === "Glass") {
-      containerBackdrop = "blur(15px) saturate(200%)";
-      containerBackground = "rgba(255, 255, 255, 0.2)";
-      containerBorder = "1px solid rgba(255, 255, 255, 0.3)";
-    } else if (materialMode === "Matte") {
-      containerFilter = "grayscale(30%) contrast(0.7) brightness(1.1)";
-    } else if (materialMode === "Chrome") {
-      containerFilter = "contrast(1.3) brightness(1.2) saturate(150%) hue-rotate(5deg)";
+  const handleIntensityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newIntensity = parseInt(e.target.value);
+    onLightingChange({ ...lighting, intensity: newIntensity });
+    
+    const app = splineAppRef.current;
+    if (!app) return;
+
+    // Convert 10~100 scale to 0.1~1.0 for lighting intensity
+    const value = newIntensity / 100;
+
+    try {
+      // 1. Try finding light object by common names
+      let light = app.findObjectByName?.("Light") 
+               || app.findObjectByName?.("DirectionalLight")
+               || app.findObjectByName?.("SpotLight")
+               || app.findObjectByName?.("PointLight");
+
+      // 2. Fallback: Iterate all objects to find one with type matching a light
+      if (!light && app.getObjects) {
+        const objects = app.getObjects();
+        light = objects.find((o: any) => 
+          o.type === 'DirectionalLight' || o.type === 'SpotLight' || o.type === 'PointLight' || o.name?.includes('Light')
+        );
+      }
+
+      // 3. Direct Binding
+      if (light) {
+        light.intensity = value;
+      }
+      
+      // Keep variable mapping for safety
+      app.setVariable?.("Intensity", value);
+    } catch (err) {
+      console.error("Failed to update lighting:", err);
     }
-  }
+  };
 
   return (
     <div className="relative w-full h-full overflow-hidden transition-colors duration-1000 bg-[#030303]">
@@ -524,7 +540,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
         style={{ 
           background: `${overlayHex}${overlayAlpha}`, 
-          filter: `brightness(${brightness})`, 
           mixBlendMode: "screen" 
         }} />
 
@@ -562,11 +577,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         className="absolute inset-0 z-0"
         onContextMenu={e => e.preventDefault()}
         style={{ 
-          WebkitFilter: containerFilter, filter: containerFilter, 
-          WebkitBackdropFilter: containerBackdrop, backdropFilter: containerBackdrop,
-          opacity: containerOpacity,
-          background: containerBackground,
-          border: containerBorder,
           transform: `scale(${zoomLevel})`, 
           transition: "all 0.5s ease-out" 
         }}>
@@ -693,7 +703,24 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                     <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Material Presets</p>
                     <div className="flex gap-2 mb-6">
                       {["Glass", "Matte", "Chrome"].map(mat => (
-                        <button key={mat} onClick={() => onMaterialModeChange(mat)}
+                        <button key={mat} onClick={() => {
+                          onMaterialModeChange(mat);
+                          const app = splineAppRef.current;
+                          if (app) {
+                            try {
+                              app.setVariable?.("MaterialMode", mat);
+                              const lightObj = app.findObjectByName?.("DirectionalLight")
+                                            ?? app.findObjectByName?.("SpotLight")
+                                            ?? app.findObjectByName?.("PointLight")
+                                            ?? app.findObjectByName?.("Light");
+                              if (lightObj) {
+                                if (mat === "Glass") lightObj.intensity = 1.5;
+                                else if (mat === "Matte") lightObj.intensity = 0.8;
+                                else if (mat === "Chrome") lightObj.intensity = 2.0;
+                              }
+                            } catch (_) {}
+                          }
+                        }}
                           className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg border transition-all ${materialMode === mat ? "bg-white text-black border-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10"}`}>
                           {mat}
                         </button>
@@ -770,7 +797,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                       <span className="text-[9px] font-mono" style={{ color:lighting.color }}>{lighting.intensity}%</span>
                     </div>
                     <input type="range" min={10} max={100} value={lighting.intensity}
-                      onChange={(e) => onLightingChange({ ...lighting, intensity:parseInt(e.target.value) })}
+                      onChange={handleIntensityChange}
                       className="w-full h-1 cursor-pointer transition-colors duration-500 accent-white" />
                     <div className="h-1 rounded-full mt-2 overflow-hidden transition-all duration-500 bg-white/[0.04]">
                       <motion.div className="h-full rounded-full"
@@ -1391,9 +1418,91 @@ function CriticPopover({ popover, onClose, onSubmit }:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  CINEMATIC ENTRANCE
+// ─────────────────────────────────────────────────────────────────────────────
+function CinematicEntrance({ onExplore }: { onExplore: () => void }) {
+  const [showExplore, setShowExplore] = useState(false);
+  const [rippleActive, setRippleActive] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowExplore(true), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleExploreClick = () => {
+    setRippleActive(true);
+    setTimeout(() => {
+      onExplore();
+    }, 1000);
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden"
+      exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
+    >
+      <AnimatePresence>
+        {rippleActive && (
+          <motion.div
+            initial={{ scale: 0, opacity: 1 }}
+            animate={{ scale: 200, opacity: 1 }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute z-10 w-20 h-20 rounded-full"
+            style={{ 
+              background: "#000000", 
+              originX: "50%", 
+              originY: "50%" 
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="relative z-20 flex flex-col items-center">
+        <motion.div
+          animate={{ y: [-15, 15], x: [-5, 5] }}
+          transition={{ repeat: Infinity, repeatType: "reverse", duration: 4, ease: "easeInOut" }}
+          className="relative px-12 py-8 rounded-3xl border border-white/10 flex items-center justify-center shadow-[0_0_50px_rgba(255,255,255,0.03)]"
+          style={{ background: "rgba(255, 255, 255, 0.02)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}
+        >
+          <h1 className="text-7xl md:text-9xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600 select-none"
+              style={{ filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.5))" }}>
+            WELCOME
+          </h1>
+          
+          <motion.div
+            className="absolute top-2 left-[18%] md:left-[12%] text-3xl"
+            animate={{ y: [0, -8, 0], rotate: [-10, 15, -10] }}
+            transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+            style={{ filter: "drop-shadow(0px 4px 6px rgba(0,0,0,0.6))" }}
+          >
+            🧗
+          </motion.div>
+        </motion.div>
+
+        <AnimatePresence>
+          {showExplore && (
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              onClick={handleExploreClick}
+              className="mt-16 px-10 py-3 rounded-full border border-pink-500 text-pink-400 font-bold uppercase tracking-[0.2em] text-sm transition-all hover:bg-pink-500/10 hover:shadow-[0_0_25px_rgba(236,72,153,0.4)] active:scale-95"
+            >
+              Explore
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
+  const [introCompleted, setIntroCompleted] = useState(false);
   const [studioLights, setStudioLights] = useState<ThreePointLights>({
     key: { intensity: 100, color: '#ffffff' },
     fill: { intensity: 50, color: '#a0c0ff' },
@@ -1471,8 +1580,15 @@ export default function ThreeDMoodApp() {
   };
 
   return (
-    <div className={`min-h-screen bg-black overflow-x-hidden ${presentationMode ? "h-screen overflow-hidden" : ""}`}>
-      {/* ── Fixed Header ── */}
+    <>
+      <AnimatePresence>
+        {!introCompleted && (
+          <CinematicEntrance key="intro" onExplore={() => setIntroCompleted(true)} />
+        )}
+      </AnimatePresence>
+
+      <div className={`min-h-screen bg-black overflow-x-hidden ${(presentationMode || !introCompleted) ? "h-screen overflow-hidden" : ""}`}>
+        {/* ── Fixed Header ── */}
       <header className={`fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10 transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         style={{ background:"rgba(0,0,0,0.78)", backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
         <motion.button onClick={() => scrollToSection("studio")}
@@ -1567,5 +1683,6 @@ export default function ThreeDMoodApp() {
         </div>
       </footer>
     </div>
+    </>
   );
 }
