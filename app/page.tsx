@@ -9,7 +9,7 @@
 import React, {
   useState, useEffect, useRef, useCallback,
 } from "react";
-import { motion, AnimatePresence, useMotionValue } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 
@@ -1424,10 +1424,29 @@ function CinematicEntrance({ onExplore }: { onExplore: () => void }) {
   const [showExplore, setShowExplore] = useState(false);
   const [rippleActive, setRippleActive] = useState(false);
 
+  // Motion values for typography interaction
+  const rawMouseX = useMotionValue(0);
+  const distanceX = useMotionValue(0);
+
+  // Springs for smooth movement
+  const smoothDistanceX = useSpring(distanceX, { stiffness: 100, damping: 20 });
+  const smoothRawX = useSpring(rawMouseX, { stiffness: 80, damping: 25 });
+
+  // Transforms
+  const gap = useTransform(smoothDistanceX, [0, 800], ["0px", "100px"]); 
+  const dotX = useTransform(smoothRawX, [-800, 800], ["-250px", "250px"]); 
+
   useEffect(() => {
     const timer = setTimeout(() => setShowExplore(true), 2000);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const centerX = window.innerWidth / 2;
+    const diffX = e.clientX - centerX;
+    rawMouseX.set(diffX);
+    distanceX.set(Math.abs(diffX));
+  };
 
   const handleExploreClick = () => {
     setRippleActive(true);
@@ -1436,8 +1455,11 @@ function CinematicEntrance({ onExplore }: { onExplore: () => void }) {
     }, 1000);
   };
 
+  const letters = "WELCOME".split("");
+
   return (
     <motion.div
+      onMouseMove={handleMouseMove}
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden"
       exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
     >
@@ -1457,28 +1479,35 @@ function CinematicEntrance({ onExplore }: { onExplore: () => void }) {
         )}
       </AnimatePresence>
 
-      <div className="relative z-20 flex flex-col items-center">
+      <div className="relative z-20 flex flex-col items-center w-full">
+        {/* Minimalist Interactive Typography */}
         <motion.div
-          animate={{ y: [-15, 15], x: [-5, 5] }}
+          animate={{ y: [-10, 10], x: [-5, 5] }}
           transition={{ repeat: Infinity, repeatType: "reverse", duration: 4, ease: "easeInOut" }}
-          className="relative px-12 py-8 rounded-3xl border border-white/10 flex items-center justify-center shadow-[0_0_50px_rgba(255,255,255,0.03)]"
-          style={{ background: "rgba(255, 255, 255, 0.02)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}
+          className="relative flex flex-col items-center justify-center w-full"
         >
-          <h1 className="text-7xl md:text-9xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-zinc-200 to-zinc-600 select-none"
-              style={{ filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.5))" }}>
-            WELCOME
-          </h1>
-          
+          {/* Moving Yellow Dot (Climber) */}
           <motion.div
-            className="absolute top-2 left-[18%] md:left-[12%] text-3xl"
-            animate={{ y: [0, -8, 0], rotate: [-10, 15, -10] }}
-            transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-            style={{ filter: "drop-shadow(0px 4px 6px rgba(0,0,0,0.6))" }}
+            className="absolute top-[-10px] w-2.5 h-2.5 rounded-full bg-yellow-400 z-10"
+            style={{ x: dotX }}
+          />
+
+          <motion.div 
+            className="flex items-center justify-center"
+            style={{ gap }}
           >
-            🧗
+            {letters.map((letter, i) => (
+              <motion.span 
+                key={i} 
+                className="text-7xl md:text-[9rem] font-black tracking-tighter text-white select-none leading-none"
+              >
+                {letter}
+              </motion.span>
+            ))}
           </motion.div>
         </motion.div>
 
+        {/* Explore Button */}
         <AnimatePresence>
           {showExplore && (
             <motion.button
@@ -1487,7 +1516,7 @@ function CinematicEntrance({ onExplore }: { onExplore: () => void }) {
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
               onClick={handleExploreClick}
-              className="mt-16 px-10 py-3 rounded-full border border-pink-500 text-pink-400 font-bold uppercase tracking-[0.2em] text-sm transition-all hover:bg-pink-500/10 hover:shadow-[0_0_25px_rgba(236,72,153,0.4)] active:scale-95"
+              className="mt-24 px-10 py-3 rounded-full border border-pink-500 text-pink-400 font-bold uppercase tracking-[0.2em] text-sm transition-all hover:bg-pink-500/10 hover:shadow-[0_0_25px_rgba(236,72,153,0.4)] active:scale-95"
             >
               Explore
             </motion.button>
