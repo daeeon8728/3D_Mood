@@ -39,9 +39,9 @@ const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface ThreePointLights {
-  key: { intensity: number; color: string };
-  fill: { intensity: number; color: string };
-  rim: { intensity: number; color: string };
+  key: { intensity: number; color: string; position?: { x: number; y: number; z: number } };
+  fill: { intensity: number; color: string; position?: { x: number; y: number; z: number } };
+  rim: { intensity: number; color: string; position?: { x: number; y: number; z: number } };
 }
 
 interface SceneConfig {
@@ -235,13 +235,14 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
 // ─────────────────────────────────────────────────────────────────────────────
 //  SPLINE HERO SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation, studioLights, onStudioLightsChange, materialMode, onMaterialModeChange }:
+function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation, studioLights, onStudioLightsChange, materialMode, onMaterialModeChange, backgroundColor, onBackgroundColorChange }:
   { currentSceneId: string; onSceneChange: (id: string) => void;
     lighting: LightingState; onLightingChange: (l: LightingState) => void;
     criticMode: boolean; onCanvasClick: (x: number, y: number, cx: number, cy: number) => void;
     presentationMode: boolean; onTogglePresentation: () => void;
     studioLights: ThreePointLights; onStudioLightsChange: (l: ThreePointLights) => void;
     materialMode: string; onMaterialModeChange: (m: string) => void;
+    backgroundColor: string; onBackgroundColorChange: (c: string) => void;
   }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -345,16 +346,31 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
           keyL.intensity = studioLights.key.intensity / 100; 
           if (keyL.color && typeof keyL.color.set === 'function') keyL.color.set(studioLights.key.color); 
           else keyL.color = studioLights.key.color;
+          if (studioLights.key.position && keyL.position) {
+            keyL.position.x = studioLights.key.position.x;
+            keyL.position.y = studioLights.key.position.y;
+            keyL.position.z = studioLights.key.position.z;
+          }
         }
         if (fillL) { 
           fillL.intensity = studioLights.fill.intensity / 100; 
           if (fillL.color && typeof fillL.color.set === 'function') fillL.color.set(studioLights.fill.color); 
           else fillL.color = studioLights.fill.color;
+          if (studioLights.fill.position && fillL.position) {
+            fillL.position.x = studioLights.fill.position.x;
+            fillL.position.y = studioLights.fill.position.y;
+            fillL.position.z = studioLights.fill.position.z;
+          }
         }
         if (rimL) { 
           rimL.intensity = studioLights.rim.intensity / 100; 
           if (rimL.color && typeof rimL.color.set === 'function') rimL.color.set(studioLights.rim.color); 
           else rimL.color = studioLights.rim.color;
+          if (studioLights.rim.position && rimL.position) {
+            rimL.position.x = studioLights.rim.position.x;
+            rimL.position.y = studioLights.rim.position.y;
+            rimL.position.z = studioLights.rim.position.z;
+          }
         }
 
         // 2. Fallback for Material Mode (Glass, Matte, Chrome)
@@ -370,9 +386,15 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
             if (m.opacity !== undefined) m.opacity = 1.0;
           }
         });
+
+        // 3. Fallback for Background Color (if Spline has a bg mesh)
+        const bgMesh = objects.find((o: any) => o.name && (o.name.toLowerCase() === 'bg' || o.name.toLowerCase() === 'background'));
+        if (bgMesh && bgMesh.color && typeof bgMesh.color.set === 'function') {
+            bgMesh.color.set(backgroundColor);
+        }
       }
     } catch (_) {}
-  }, [studioLights, materialMode, isLoaded]);
+  }, [studioLights, materialMode, backgroundColor, isLoaded]);
 
   // SSR guard
   useEffect(() => { 
@@ -553,7 +575,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden transition-colors duration-1000 bg-[#030303]">
+    <div className="relative w-full h-full overflow-hidden transition-colors duration-1000" style={{ backgroundColor }}>
       {/* ── Background ── */}
       <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 opacity-0" />
 
@@ -616,7 +638,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         {/* Loading skeleton */}
         <AnimatePresence>
           {(!isLoaded || !mounted) && (
-            <motion.div key="loading" className="absolute inset-0 flex flex-col items-center justify-center bg-[#030303] z-20"
+            <motion.div key="loading" className="absolute inset-0 flex flex-col items-center justify-center z-20"
+              style={{ backgroundColor }}
               initial={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:0.8 }}>
               <motion.div className="w-12 h-12 rounded-2xl border border-white/10 flex items-center justify-center mb-6"
                 style={{ background: `${glowHex}18` }}
@@ -753,22 +776,43 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                     
                     <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">3-Point Lighting</p>
                     <div className="flex flex-col gap-4">
-                      {(Object.entries(studioLights) as [keyof ThreePointLights, {intensity: number, color: string}][]).map(([key, light]) => (
-                        <div key={key} className="flex flex-col gap-2">
+                      {(Object.entries(studioLights) as [keyof ThreePointLights, {intensity: number, color: string, position?: {x:number, y:number, z:number}}][]).map(([key, light]) => (
+                        <div key={key} className="flex flex-col gap-2 border-b border-white/5 pb-3">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-semibold text-zinc-300 uppercase">{key} Light</span>
                             <input type="color" value={light.color} 
                               onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, color: e.target.value}})}
                               className="w-5 h-5 rounded-full border border-white/20 cursor-pointer bg-transparent" />
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] text-zinc-500 w-4">INT</span>
                             <input type="range" min="0" max="200" value={light.intensity}
                               onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, intensity: parseInt(e.target.value)}})}
                               className="w-full h-1 bg-white/10 rounded-full appearance-none outline-none cursor-pointer" />
                             <span className="text-[9px] text-zinc-500 w-6">{light.intensity}</span>
                           </div>
+                          {light.position && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {['x', 'y', 'z'].map(axis => (
+                                <div key={axis} className="flex items-center gap-1 w-1/3">
+                                  <span className="text-[8px] text-zinc-500 uppercase">{axis}</span>
+                                  <input type="range" min="-1000" max="1000" value={light.position![axis as keyof typeof light.position]}
+                                    onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, position: {...light.position, [axis]: parseInt(e.target.value)}}})}
+                                    className="w-full h-1 bg-white/10 rounded-full appearance-none outline-none cursor-pointer" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
+                    </div>
+
+                    <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3 mt-4">Environment</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-semibold text-zinc-300 uppercase">Background</span>
+                      <input type="color" value={backgroundColor} 
+                        onChange={(e) => onBackgroundColorChange(e.target.value)}
+                        className="w-6 h-6 rounded-full border border-white/20 cursor-pointer bg-transparent" />
                     </div>
                   </div>
                 </motion.div>
@@ -1449,10 +1493,11 @@ function CriticPopover({ popover, onClose, onSubmit }:
 export default function ThreeDMoodApp() {
   const [introCompleted, setIntroCompleted] = useState(false);
   const [studioLights, setStudioLights] = useState<ThreePointLights>({
-    key: { intensity: 100, color: '#ffffff' },
-    fill: { intensity: 50, color: '#a0c0ff' },
-    rim: { intensity: 80, color: '#ffb0a0' }
+    key: { intensity: 100, color: '#ffffff', position: { x: 500, y: 500, z: 500 } },
+    fill: { intensity: 50, color: '#a0c0ff', position: { x: -500, y: 300, z: 500 } },
+    rim: { intensity: 80, color: '#ffb0a0', position: { x: 0, y: 500, z: -1000 } }
   });
+  const [backgroundColor, setBackgroundColor] = useState<string>('#030303');
   const [materialMode, setMaterialMode] = useState<string>('Matte');
   const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
@@ -1590,6 +1635,8 @@ export default function ThreeDMoodApp() {
             onStudioLightsChange={setStudioLights}
             materialMode={materialMode}
             onMaterialModeChange={setMaterialMode}
+            backgroundColor={backgroundColor}
+            onBackgroundColorChange={setBackgroundColor}
           />
         </div>
       </section>
