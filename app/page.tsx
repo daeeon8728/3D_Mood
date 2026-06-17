@@ -331,25 +331,45 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       if (app.getObjects) {
         const objects = app.getObjects();
         
-        const keyL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'keylight');
-        const fillL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'filllight');
-        const rimL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'rimlight');
+        // 1. Fallback for Studio Lights
+        const allLights = objects.filter((o: any) => 
+          o.type === 'DirectionalLight' || o.type === 'SpotLight' || o.type === 'PointLight' || (o.name && o.name.toLowerCase().includes('light'))
+        );
+        
+        const keyL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'keylight') || allLights[0];
+        const fillL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'filllight') || allLights[1];
+        const rimL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'rimlight') || allLights[2];
 
+        // Divide by 100 to map 0~200 scale to Spline's 0.0~2.0 intensity scale
         if (keyL) { 
-          keyL.intensity = studioLights.key.intensity; 
+          keyL.intensity = studioLights.key.intensity / 100; 
           if (keyL.color && typeof keyL.color.set === 'function') keyL.color.set(studioLights.key.color); 
           else keyL.color = studioLights.key.color;
         }
         if (fillL) { 
-          fillL.intensity = studioLights.fill.intensity; 
+          fillL.intensity = studioLights.fill.intensity / 100; 
           if (fillL.color && typeof fillL.color.set === 'function') fillL.color.set(studioLights.fill.color); 
           else fillL.color = studioLights.fill.color;
         }
         if (rimL) { 
-          rimL.intensity = studioLights.rim.intensity; 
+          rimL.intensity = studioLights.rim.intensity / 100; 
           if (rimL.color && typeof rimL.color.set === 'function') rimL.color.set(studioLights.rim.color); 
           else rimL.color = studioLights.rim.color;
         }
+
+        // 2. Fallback for Material Mode (Glass, Matte, Chrome)
+        // Since setVariable("MaterialMode") requires the Spline scene to have that variable built-in,
+        // we directly adjust mesh opacity to visually simulate the materials.
+        const meshes = objects.filter((o: any) => o.type === 'Mesh' && !o.name.toLowerCase().includes('bg') && !o.name.toLowerCase().includes('background'));
+        meshes.forEach((m: any) => {
+          if (materialMode === "Glass") {
+            if (m.opacity !== undefined) m.opacity = 0.3;
+          } else if (materialMode === "Matte") {
+            if (m.opacity !== undefined) m.opacity = 1.0;
+          } else if (materialMode === "Chrome") {
+            if (m.opacity !== undefined) m.opacity = 1.0;
+          }
+        });
       }
     } catch (_) {}
   }, [studioLights, materialMode, isLoaded]);
