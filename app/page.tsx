@@ -376,7 +376,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         // 2. Fallback for Material Mode (Glass, Matte, Chrome)
         // Since setVariable("MaterialMode") requires the Spline scene to have that variable built-in,
         // we directly adjust mesh opacity to visually simulate the materials.
-        const meshes = objects.filter((o: any) => o.type === 'Mesh' && !o.name.toLowerCase().includes('bg') && !o.name.toLowerCase().includes('background'));
+        const meshes = objects.filter((o: any) => o.type === 'Mesh' && !(o.name && (o.name.toLowerCase().includes('bg') || o.name.toLowerCase().includes('background'))));
         meshes.forEach((m: any) => {
           if (materialMode === "Glass") {
             if (m.opacity !== undefined) m.opacity = 0.3;
