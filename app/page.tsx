@@ -38,11 +38,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_sh92dIOhgb0wew25kly21w_xSLYWdko";
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export interface ThreePointLights {
-  key: { intensity: number; color: string; position?: { x: number; y: number; z: number } };
-  fill: { intensity: number; color: string; position?: { x: number; y: number; z: number } };
-  rim: { intensity: number; color: string; position?: { x: number; y: number; z: number } };
-}
 
 interface SceneConfig {
   id: string;
@@ -235,14 +230,11 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
 // ─────────────────────────────────────────────────────────────────────────────
 //  SPLINE HERO SECTION
 // ─────────────────────────────────────────────────────────────────────────────
-function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation, studioLights, onStudioLightsChange, materialMode, onMaterialModeChange, backgroundColor, onBackgroundColorChange }:
+function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange, criticMode, onCanvasClick, presentationMode, onTogglePresentation }:
   { currentSceneId: string; onSceneChange: (id: string) => void;
     lighting: LightingState; onLightingChange: (l: LightingState) => void;
     criticMode: boolean; onCanvasClick: (x: number, y: number, cx: number, cy: number) => void;
     presentationMode: boolean; onTogglePresentation: () => void;
-    studioLights: ThreePointLights; onStudioLightsChange: (l: ThreePointLights) => void;
-    materialMode: string; onMaterialModeChange: (m: string) => void;
-    backgroundColor: string; onBackgroundColorChange: (c: string) => void;
   }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -252,7 +244,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const [mounted,     setMounted]     = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [panelsOpen, setPanelsOpen] = useState({ left: false, right: false });
-  const [isStudioMode, setIsStudioMode] = useState(false);
   const [zoomLevel,   setZoomLevel]   = useState(1);
   
   // ── Framer Motion Drag Zoom ────────────────────────────────────────────────
@@ -310,91 +301,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [lighting.autoRotate]);
-
-  // ── Studio 3-Point Lighting & Material ──────────────────────────────────────
-  useEffect(() => {
-    const app = splineAppRef.current;
-    if (!app) return;
-    const setVar = (name: string, val: any) => {
-      try { app.setVariable?.(name, val); } catch (e) {}
-    };
-
-    setVar("MaterialMode", materialMode);
-    
-    setVar("KeyLightIntensity", studioLights.key.intensity);
-    setVar("KeyLightColor", studioLights.key.color);
-    setVar("FillLightIntensity", studioLights.fill.intensity);
-    setVar("FillLightColor", studioLights.fill.color);
-    setVar("RimLightIntensity", studioLights.rim.intensity);
-    setVar("RimLightColor", studioLights.rim.color);
-
-    try {
-      if (app.getObjects) {
-        const objects = app.getObjects();
-        
-        // 1. Fallback for Studio Lights
-        const allLights = objects.filter((o: any) => 
-          o.type === 'DirectionalLight' || o.type === 'SpotLight' || o.type === 'PointLight' || (o.name && o.name.toLowerCase().includes('light'))
-        );
-        
-        const keyL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'keylight') || allLights[0];
-        const fillL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'filllight') || allLights[1];
-        const rimL = objects.find((o: any) => o.name && o.name.toLowerCase().replace(/\s/g, '') === 'rimlight') || allLights[2];
-
-        // Divide by 100 to map 0~200 scale to Spline's 0.0~2.0 intensity scale
-        if (keyL) { 
-          keyL.intensity = studioLights.key.intensity / 100; 
-          if (keyL.color && typeof keyL.color.set === 'function') keyL.color.set(studioLights.key.color); 
-          else keyL.color = studioLights.key.color;
-          if (studioLights.key.position && keyL.position) {
-            keyL.position.x = studioLights.key.position.x;
-            keyL.position.y = studioLights.key.position.y;
-            keyL.position.z = studioLights.key.position.z;
-          }
-        }
-        if (fillL) { 
-          fillL.intensity = studioLights.fill.intensity / 100; 
-          if (fillL.color && typeof fillL.color.set === 'function') fillL.color.set(studioLights.fill.color); 
-          else fillL.color = studioLights.fill.color;
-          if (studioLights.fill.position && fillL.position) {
-            fillL.position.x = studioLights.fill.position.x;
-            fillL.position.y = studioLights.fill.position.y;
-            fillL.position.z = studioLights.fill.position.z;
-          }
-        }
-        if (rimL) { 
-          rimL.intensity = studioLights.rim.intensity / 100; 
-          if (rimL.color && typeof rimL.color.set === 'function') rimL.color.set(studioLights.rim.color); 
-          else rimL.color = studioLights.rim.color;
-          if (studioLights.rim.position && rimL.position) {
-            rimL.position.x = studioLights.rim.position.x;
-            rimL.position.y = studioLights.rim.position.y;
-            rimL.position.z = studioLights.rim.position.z;
-          }
-        }
-
-        // 2. Fallback for Material Mode (Glass, Matte, Chrome)
-        // Since setVariable("MaterialMode") requires the Spline scene to have that variable built-in,
-        // we directly adjust mesh opacity to visually simulate the materials.
-        const meshes = objects.filter((o: any) => o.type === 'Mesh' && !(o.name && (o.name.toLowerCase().includes('bg') || o.name.toLowerCase().includes('background'))));
-        meshes.forEach((m: any) => {
-          if (materialMode === "Glass") {
-            if (m.opacity !== undefined) m.opacity = 0.3;
-          } else if (materialMode === "Matte") {
-            if (m.opacity !== undefined) m.opacity = 1.0;
-          } else if (materialMode === "Chrome") {
-            if (m.opacity !== undefined) m.opacity = 1.0;
-          }
-        });
-
-        // 3. Fallback for Background Color (if Spline has a bg mesh)
-        const bgMesh = objects.find((o: any) => o.name && (o.name.toLowerCase() === 'bg' || o.name.toLowerCase() === 'background'));
-        if (bgMesh && bgMesh.color && typeof bgMesh.color.set === 'function') {
-            bgMesh.color.set(backgroundColor);
-        }
-      }
-    } catch (_) {}
-  }, [studioLights, materialMode, backgroundColor, isLoaded]);
 
   // SSR guard
   useEffect(() => { 
@@ -575,7 +481,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden transition-colors duration-1000" style={{ backgroundColor }}>
+    <div className="relative w-full h-full overflow-hidden transition-colors duration-1000" style={{ backgroundColor: '#030303' }}>
       {/* ── Background ── */}
       <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 opacity-0" />
 
@@ -600,24 +506,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
       }} />
 
-      {/* ── Studio 3-Point Lighting Simulation Overlay ── */}
-      {isStudioMode && (
-        <div className="absolute inset-0 pointer-events-none z-10 mix-blend-screen transition-opacity duration-1000">
-          {/* Key Light */}
-          <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%]" style={{
-            background: `radial-gradient(circle, ${studioLights.key.color}${Math.round((studioLights.key.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 60%)`
-          }} />
-          {/* Fill Light */}
-          <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%]" style={{
-            background: `radial-gradient(circle, ${studioLights.fill.color}${Math.round((studioLights.fill.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 60%)`
-          }} />
-          {/* Rim Light */}
-          <div className="absolute top-[-30%] right-[10%] w-[60%] h-[60%]" style={{
-            background: `radial-gradient(circle, ${studioLights.rim.color}${Math.round((studioLights.rim.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 70%)`
-          }} />
-        </div>
-      )}
-
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
         className="absolute inset-0 z-0"
@@ -639,7 +527,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         <AnimatePresence>
           {(!isLoaded || !mounted) && (
             <motion.div key="loading" className="absolute inset-0 flex flex-col items-center justify-center z-20"
-              style={{ backgroundColor }}
+              style={{ backgroundColor: '#030303' }}
               initial={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:0.8 }}>
               <motion.div className="w-12 h-12 rounded-2xl border border-white/10 flex items-center justify-center mb-6"
                 style={{ background: `${glowHex}18` }}
@@ -670,23 +558,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
       {/* ── Right panel: mood presets + controls ── */}
       <div className={`absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-        {/* Studio Controls Toggle */}
-        <motion.button 
-          onClick={() => {
-            if (!panelsOpen.right) {
-              setPanelsOpen(p => ({...p, right: true}));
-              setIsStudioMode(true);
-            } else {
-              setIsStudioMode(!isStudioMode);
-            }
-          }}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${isStudioMode ? 'border-pink-500/80 bg-pink-500/10' : 'border-white/20 bg-black/60'} backdrop-blur-xl`}
-          style={{ boxShadow: isStudioMode ? "0 0 20px rgba(255, 0, 127, 0.6), inset 0 0 10px rgba(255, 0, 127, 0.3)" : "0 0 15px rgba(255,255,255,0.05)" }}
-          whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
-          <span>🎬</span>
-          <span className={`text-[10px] font-bold uppercase tracking-widest ${isStudioMode ? 'text-pink-100' : 'text-white'}`}>3D Render Studio</span>
-        </motion.button>
-
         {/* Presentation Toggle */}
         <motion.button onClick={onTogglePresentation}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/30 hover:bg-yellow-500/10 transition-all shadow-[0_0_15px_rgba(234,179,8,0.15)]"
@@ -742,82 +613,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                 </div>
               </motion.button>
 
-              {isStudioMode ? (
-                /* Studio Setup */
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl overflow-hidden border border-white/[0.07] transition-all duration-500"
-                  style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
-                  <div className="px-4 pt-4 pb-3">
-                    <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Material Presets</p>
-                    <div className="flex gap-2 mb-6">
-                      {["Glass", "Matte", "Chrome"].map(mat => (
-                        <button key={mat} onClick={() => {
-                          onMaterialModeChange(mat);
-                          const app = splineAppRef.current;
-                          if (app) {
-                            try {
-                              app.setVariable?.("MaterialMode", mat);
-                              const lightObj = app.findObjectByName?.("DirectionalLight")
-                                            ?? app.findObjectByName?.("SpotLight")
-                                            ?? app.findObjectByName?.("PointLight")
-                                            ?? app.findObjectByName?.("Light");
-                              if (lightObj) {
-                                if (mat === "Glass") lightObj.intensity = 1.5;
-                                else if (mat === "Matte") lightObj.intensity = 0.8;
-                                else if (mat === "Chrome") lightObj.intensity = 2.0;
-                              }
-                            } catch (_) {}
-                          }
-                        }}
-                          className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg border transition-all ${materialMode === mat ? "bg-white text-black border-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10"}`}>
-                          {mat}
-                        </button>
-                      ))}
-                    </div>
-                    
-                    <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">3-Point Lighting</p>
-                    <div className="flex flex-col gap-4">
-                      {(Object.entries(studioLights) as [keyof ThreePointLights, {intensity: number, color: string, position?: {x:number, y:number, z:number}}][]).map(([key, light]) => (
-                        <div key={key} className="flex flex-col gap-2 border-b border-white/5 pb-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-semibold text-zinc-300 uppercase">{key} Light</span>
-                            <input type="color" value={light.color} 
-                              onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, color: e.target.value}})}
-                              className="w-5 h-5 rounded-full border border-white/20 cursor-pointer bg-transparent" />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[8px] text-zinc-500 w-4">INT</span>
-                            <input type="range" min="0" max="200" value={light.intensity}
-                              onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, intensity: parseInt(e.target.value)}})}
-                              className="w-full h-1 bg-white/10 rounded-full appearance-none outline-none cursor-pointer" />
-                            <span className="text-[9px] text-zinc-500 w-6">{light.intensity}</span>
-                          </div>
-                          {light.position && (
-                            <div className="flex items-center gap-2 mt-1">
-                              {['x', 'y', 'z'].map(axis => (
-                                <div key={axis} className="flex items-center gap-1 w-1/3">
-                                  <span className="text-[8px] text-zinc-500 uppercase">{axis}</span>
-                                  <input type="range" min="-1000" max="1000" value={light.position![axis as keyof typeof light.position]}
-                                    onChange={(e) => onStudioLightsChange({...studioLights, [key]: {...light, position: {...light.position, [axis]: parseInt(e.target.value)}}})}
-                                    className="w-full h-1 bg-white/10 rounded-full appearance-none outline-none cursor-pointer" />
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3 mt-4">Environment</p>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-semibold text-zinc-300 uppercase">Background</span>
-                      <input type="color" value={backgroundColor} 
-                        onChange={(e) => onBackgroundColorChange(e.target.value)}
-                        className="w-6 h-6 rounded-full border border-white/20 cursor-pointer bg-transparent" />
-                    </div>
-                  </div>
-                </motion.div>
-              ) : (
-                /* Mood Presets (Old UI) */
+              {/* Mood Presets */}
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl overflow-hidden border transition-all duration-500 border-white/[0.07]"
                   style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
                   <div className="px-4 pt-4 pb-2">
@@ -887,7 +683,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                     </button>
                   </div>
                 </motion.div>
-              )}
 
               {/* Status badge */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.06]"
@@ -1492,13 +1287,7 @@ function CriticPopover({ popover, onClose, onSubmit }:
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
   const [introCompleted, setIntroCompleted] = useState(false);
-  const [studioLights, setStudioLights] = useState<ThreePointLights>({
-    key: { intensity: 100, color: '#ffffff', position: { x: 500, y: 500, z: 500 } },
-    fill: { intensity: 50, color: '#a0c0ff', position: { x: -500, y: 300, z: 500 } },
-    rim: { intensity: 80, color: '#ffb0a0', position: { x: 0, y: 500, z: -1000 } }
-  });
-  const [backgroundColor, setBackgroundColor] = useState<string>('#030303');
-  const [materialMode, setMaterialMode] = useState<string>('Matte');
+
   const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [criticMode,    setCriticMode]    = useState(false);
@@ -1631,12 +1420,6 @@ export default function ThreeDMoodApp() {
             }}
             presentationMode={presentationMode}
             onTogglePresentation={handleTogglePresentation}
-            studioLights={studioLights}
-            onStudioLightsChange={setStudioLights}
-            materialMode={materialMode}
-            onMaterialModeChange={setMaterialMode}
-            backgroundColor={backgroundColor}
-            onBackgroundColorChange={setBackgroundColor}
           />
         </div>
       </section>
