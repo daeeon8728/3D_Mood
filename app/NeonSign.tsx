@@ -225,7 +225,7 @@ function MechanicalLever({ onSnap }: LeverProps) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
+export default function NeonSign({ onExplore }: { onExplore?: (remember: boolean) => void }) {
   const containerRef            = useRef<HTMLDivElement>(null);
   
   const [mousePos, setMousePos]       = useState({ x: 50, y: 50 });
@@ -271,7 +271,15 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
   const handleClick = () => {
     if (!isPowered || isFadingOut) return;
     setIsFadingOut(true);
-    setTimeout(() => onExplore?.(), 1100);
+    setTimeout(() => onExplore?.(true), 1100); // remember = true (clicked through naturally)
+  };
+
+  // Skip for next time
+  const handleSkip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isFadingOut) return;
+    setIsFadingOut(true);
+    setTimeout(() => onExplore?.(true), 700); // quicker fade for skip
   };
 
   // Pre-calculate flicker keyframes
@@ -448,7 +456,7 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
             )}
           </AnimatePresence>
 
-          {/* ── Post-power hint ───────────────────────────────────────── */}
+          {/* ── Post-power hint ─────────────────────────────────────────────────────── */}
           <AnimatePresence>
             {isPowered && (
               <motion.p
@@ -460,6 +468,24 @@ export default function NeonSign({ onExplore }: { onExplore?: () => void }) {
               >
                 Click anywhere to enter
               </motion.p>
+            )}
+          </AnimatePresence>
+
+          {/* ── Skip for next time button ────────────────────────────────── */}
+          <AnimatePresence>
+            {isPowered && (
+              <motion.button
+                key="skip-btn"
+                onClick={handleSkip}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.6, delay: 2.5 }}
+                className="absolute bottom-5 right-6 z-20 text-[9px] text-zinc-600 hover:text-zinc-400 tracking-widest uppercase font-light transition-colors duration-200 cursor-pointer"
+                style={{ letterSpacing: "0.18em" }}
+              >
+                Skip for next time
+              </motion.button>
             )}
           </AnimatePresence>
         </motion.div>

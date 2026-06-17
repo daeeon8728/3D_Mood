@@ -1314,7 +1314,16 @@ function CriticPopover({ popover, onClose, onSubmit }:
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
-  const [introCompleted, setIntroCompleted] = useState(false);
+  // ── Intro skip: returning users go straight to main scene ──────────────
+  const [introCompleted, setIntroCompleted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !!localStorage.getItem("hasSeenIntro");
+  });
+
+  const handleIntroComplete = (remember: boolean) => {
+    if (remember) localStorage.setItem("hasSeenIntro", "1");
+    setIntroCompleted(true);
+  };
 
   const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
@@ -1390,7 +1399,7 @@ export default function ThreeDMoodApp() {
     <>
       <AnimatePresence>
         {!introCompleted && (
-          <NeonSign key="intro" onExplore={() => setIntroCompleted(true)} />
+          <NeonSign key="intro" onExplore={handleIntroComplete} />
         )}
       </AnimatePresence>
 
