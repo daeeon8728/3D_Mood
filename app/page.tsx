@@ -602,7 +602,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
       {/* ── Studio 3-Point Lighting Simulation Overlay ── */}
       {isStudioMode && (
-        <div className="absolute inset-0 pointer-events-none z-0 mix-blend-screen transition-opacity duration-1000">
+        <div className="absolute inset-0 pointer-events-none z-10 mix-blend-screen transition-opacity duration-1000">
           {/* Key Light */}
           <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%]" style={{
             background: `radial-gradient(circle, ${studioLights.key.color}${Math.round((studioLights.key.intensity/200)*255).toString(16).padStart(2,"0")} 0%, transparent 60%)`
@@ -729,7 +729,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                 <span className="text-[10px] font-bold text-zinc-500 mt-3">-</span>
               </div>
 
-              <div className="w-[220px] flex flex-col gap-3">
+              <div className="w-[220px] flex flex-col gap-3 overflow-y-auto overflow-x-hidden pb-4" style={{ maxHeight: "calc(100vh - 140px)", scrollbarWidth: "none" }}>
               {/* Capture Studio Button */}
               <motion.button onClick={handleCapture}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/[0.15] hover:bg-white/[0.08] transition-colors"
