@@ -16,6 +16,7 @@ import { Environment, Text3D, Center } from '@react-three/drei';
 import NeonSign from './NeonSign';
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
+import { CustomCursor, FilmNoise, MagneticButton, DocentPanel, KineticLoading, TiltCard } from "./HighEndUI";
 
 const Spline = dynamic(() => import("@splinetool/react-spline"), { 
   ssr: false, 
@@ -170,6 +171,8 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
   ];
   return (
     <>
+      <CustomCursor />
+      <FilmNoise />
       <AnimatePresence>
         {isOpen && (
           <motion.div key="backdrop" className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
@@ -243,6 +246,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const [isLoaded,    setIsLoaded]    = useState(false);
   const [mounted,     setMounted]     = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  useEffect(() => { if (!isLoaded) setIsTransitioning(true); else setTimeout(() => setIsTransitioning(false), 800); }, [isLoaded]);
   const [panelsOpen, setPanelsOpen] = useState({ left: false, right: false });
   const [zoomLevel,   setZoomLevel]   = useState(1);
   
@@ -485,6 +490,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* ── Background ── */}
       <div className="absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 opacity-0" />
 
+      <KineticLoading isVisible={isTransitioning} />
+
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
@@ -620,20 +627,22 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                     <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
                     <div className="grid grid-cols-2 gap-1.5">
                       {MOOD_PRESETS.map((p) => (
-                        <motion.button key={p.id} id={`preset-${p.id}`}
-                          onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
-                          className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left"
-                          style={{
-                            background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
-                            borderColor: activePreset===p.id ? p.accentColor+"45" : "rgba(255,255,255,0.05)",
-                            boxShadow:   activePreset===p.id ? `0 0 18px ${p.accentColor}18` : "none",
-                          }}
-                          whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}>
-                          <span className="text-lg leading-tight">{p.emoji}</span>
-                          <span className="text-[9px] font-bold mt-1 leading-none" style={{ color:activePreset===p.id?p.accentColor:"#aaa" }}>
-                            {p.label}
-                          </span>
-                        </motion.button>
+                        <MagneticButton key={p.id}>
+                          <motion.button id={`preset-${p.id}`}
+                            onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
+                            className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left w-full"
+                            style={{
+                              background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
+                              borderColor: activePreset===p.id ? p.accentColor+"45" : "rgba(255,255,255,0.05)",
+                              boxShadow:   activePreset===p.id ? `0 0 18px ${p.accentColor}18` : "none",
+                            }}
+                            whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}>
+                            <span className="text-lg leading-tight">{p.emoji}</span>
+                            <span className="text-[9px] font-bold mt-1 leading-none" style={{ color:activePreset===p.id?p.accentColor:"#aaa" }}>
+                              {p.label}
+                            </span>
+                          </motion.button>
+                        </MagneticButton>
                       ))}
                     </div>
                   </div>
@@ -683,6 +692,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                     </button>
                   </div>
                 </motion.div>
+
+              <DocentPanel preset={MOOD_PRESETS.find(p => p.id === activePreset)} onCopy={(hex) => { navigator.clipboard.writeText(hex); }} />
 
               {/* Status badge */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.06]"
