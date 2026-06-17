@@ -247,7 +247,15 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
   const [mounted,     setMounted]     = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  useEffect(() => { if (!isLoaded) setIsTransitioning(true); else setTimeout(() => setIsTransitioning(false), 800); }, [isLoaded]);
+  // Trigger kinetic type on initial load AND scene change
+  useEffect(() => {
+    setIsTransitioning(true);
+    setIsLoaded(false);
+  }, [currentSceneId]);
+  useEffect(() => {
+    if (isLoaded) setTimeout(() => setIsTransitioning(false), 1000);
+    else setIsTransitioning(true);
+  }, [isLoaded]);
   const [panelsOpen, setPanelsOpen] = useState({ left: false, right: false });
   const [zoomLevel,   setZoomLevel]   = useState(1);
   
@@ -566,13 +574,15 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* ── Right panel: mood presets + controls ── */}
       <div className={`absolute top-20 right-5 z-30 flex flex-col items-end gap-3 pointer-events-auto transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
         {/* Presentation Toggle */}
-        <motion.button onClick={onTogglePresentation}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/30 hover:bg-yellow-500/10 transition-all shadow-[0_0_15px_rgba(234,179,8,0.15)]"
-          style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}
-          whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
-          <span>🌟</span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Presentation Mode</span>
-        </motion.button>
+        <MagneticButton>
+          <motion.button onClick={onTogglePresentation}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/30 hover:bg-yellow-500/10 transition-all shadow-[0_0_15px_rgba(234,179,8,0.15)]"
+            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}
+            whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
+            <span>🌟</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Presentation Mode</span>
+          </motion.button>
+        </MagneticButton>
 
         <button onClick={() => setPanelsOpen(p => ({...p, right: !p.right}))}
           className="lg:hidden px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white border border-white/[0.1] shadow-lg transition-all active:scale-95"
@@ -693,8 +703,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                   </div>
                 </motion.div>
 
-              <DocentPanel preset={MOOD_PRESETS.find(p => p.id === activePreset)} onCopy={(hex) => { navigator.clipboard.writeText(hex); }} />
-
               {/* Status badge */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.06]"
                 style={{ background:"rgba(8,8,8,0.65)", backdropFilter:"blur(16px)" }}>
@@ -751,6 +759,15 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* Bottom gradient fade */}
       <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-[12]"
         style={{ background:"linear-gradient(to bottom, transparent, #000)" }} />
+
+      {/* ── Docent Panel (fixed bottom-left) ── */}
+      {!presentationMode && (
+        <DocentPanel
+          preset={MOOD_PRESETS.find(p => p.id === activePreset)}
+          onCopy={(hex) => { navigator.clipboard.writeText(hex).catch(() => {}); }}
+        />
+      )}
+
       {/* ── Presentation Mode Menu ── */}
       <AnimatePresence>
         {presentationMode && (
