@@ -16,7 +16,7 @@ import { Environment, Text3D, Center } from '@react-three/drei';
 import NeonSign from './NeonSign';
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
-import { CustomCursor, FilmNoise, MagneticButton, DocentPanel, KineticLoading, TiltCard } from "./HighEndUI";
+import { CustomCursor, MagneticButton, DocentPanel, KineticLoading, TiltCard } from "./HighEndUI";
 
 const Spline = dynamic(() => import("@splinetool/react-spline"), { 
   ssr: false, 
@@ -172,7 +172,6 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
   return (
     <>
       <CustomCursor />
-      <FilmNoise />
       <AnimatePresence>
         {isOpen && (
           <motion.div key="backdrop" className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"

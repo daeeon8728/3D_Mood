@@ -52,8 +52,6 @@ export function CustomCursor() {
           height: isHovering ? 56 : 36,
           backgroundColor: isHovering ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
           border: isHovering ? "1px solid rgba(255, 255, 255, 0.25)" : "1px solid rgba(255, 255, 255, 0.15)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
           boxShadow: isHovering 
             ? "0 10px 40px rgba(0, 0, 0, 0.12), inset 0 0 20px rgba(255, 255, 255, 0.15)" 
             : "0 4px 16px rgba(0, 0, 0, 0.08), inset 0 0 10px rgba(255, 255, 255, 0.05)",
@@ -93,45 +91,7 @@ export function CustomCursor() {
   );
 }
 
-// ─── 2. Animated Film Noise ──────────────────────────────────────────────────
-export function FilmNoise() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    canvas.width = 256;
-    canvas.height = 256;
-
-    let animId: number;
-    const draw = () => {
-      const imageData = ctx.createImageData(256, 256);
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const grain = Math.random() * 255;
-        data[i] = grain;
-        data[i + 1] = grain;
-        data[i + 2] = grain;
-        data[i + 3] = 255;
-      }
-      ctx.putImageData(imageData, 0, 0);
-      animId = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(animId);
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-[9997] w-full h-full"
-      style={{ opacity: 0.035, mixBlendMode: "overlay" }}
-    />
-  );
-}
 
 // ─── 3. Magnetic Wrapper ─────────────────────────────────────────────────────
 // Use as a <div> wrapper — does NOT add its own click handler
@@ -286,11 +246,11 @@ export function DocentPanel({ preset, onCopy }: { preset: any; onCopy: (hex: str
     <AnimatePresence mode="wait">
       <motion.div
         key={preset.id}
-        initial={{ opacity: 0, x: -24, scale: 0.96 }}
+        initial={{ opacity: 0, x: 24, scale: 0.96 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
-        exit={{ opacity: 0, x: -24, scale: 0.96 }}
+        exit={{ opacity: 0, x: 24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed bottom-8 left-8 z-[40] w-64 pointer-events-auto"
+        className="fixed bottom-8 right-8 z-[40] w-64 pointer-events-auto"
       >
         <TiltCard
           className="relative w-full p-5 rounded-3xl border border-white/[0.08] overflow-hidden"

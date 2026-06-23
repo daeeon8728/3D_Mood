@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { motion, AnimatePresence, useMotionValue, useAnimation, type Transition, type Variants } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useMotionTemplate, useAnimation, type Transition, type Variants } from "framer-motion";
 
 // ─── Audio Synthesis (Web Audio API) ──────────────────────────────────────────
 let audioCtx: AudioContext | null = null;
@@ -228,7 +228,10 @@ function MechanicalLever({ onSnap }: LeverProps) {
 export default function NeonSign({ onExplore }: { onExplore?: (remember: boolean) => void }) {
   const containerRef            = useRef<HTMLDivElement>(null);
   
-  const [mousePos, setMousePos]       = useState({ x: 50, y: 50 });
+  const mouseX = useMotionValue(50);
+  const mouseY = useMotionValue(50);
+  const flashlightBackground = useMotionTemplate`radial-gradient(circle 280px at ${mouseX}% ${mouseY}%, rgba(255,255,255,0.07), transparent)`;
+
   const [isPowered, setIsPowered]     = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isShaking, setIsShaking]     = useState(false);
@@ -247,12 +250,10 @@ export default function NeonSign({ onExplore }: { onExplore?: (remember: boolean
     // Flashlight logic
     if (containerRef.current) {
       const { left, top, width, height } = containerRef.current.getBoundingClientRect();
-      setMousePos({
-        x: ((e.clientX - left) / width) * 100,
-        y: ((e.clientY - top)  / height) * 100,
-      });
+      mouseX.set(((e.clientX - left) / width) * 100);
+      mouseY.set(((e.clientY - top)  / height) * 100);
     }
-  }, []);
+  }, [mouseX, mouseY]);
 
   // Lever snap event
   const handleSnap = useCallback(() => {
@@ -364,10 +365,10 @@ export default function NeonSign({ onExplore }: { onExplore?: (remember: boolean
           />
 
           {/* Mouse flashlight overlay */}
-          <div
+          <motion.div
             className="absolute inset-0 pointer-events-none mix-blend-screen"
             style={{
-              background: `radial-gradient(circle 280px at ${mousePos.x}% ${mousePos.y}%, rgba(255,255,255,0.07), transparent)`,
+              background: flashlightBackground,
               zIndex: 0,
             }}
           />
