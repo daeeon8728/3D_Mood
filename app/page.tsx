@@ -503,31 +503,14 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
-      {/* ── Lighting Simulation Overlay ── */}
-      <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
-        style={{ 
-          background: `${overlayHex}${overlayAlpha}`, 
-          mixBlendMode: "screen" 
-        }} />
-
-      {/* ── Edge glow wings ── */}
-      <div className="absolute inset-0 pointer-events-none z-[11] transition-all duration-700" style={{
-        background: `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
-      }} />
-      <div className="absolute top-0 left-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
-      }} />
-      <div className="absolute top-0 right-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
-      }} />
-
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
         className="absolute inset-0 z-0"
         onContextMenu={e => e.preventDefault()}
         style={{ 
           transform: `scale(${zoomLevel})`, 
-          transition: "all 0.5s ease-out" 
+          transition: "all 0.5s ease-out",
+          willChange: "transform"
         }}>
         {mounted && currentScene.type === "spline" && (
           <Spline

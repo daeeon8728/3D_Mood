@@ -10,7 +10,8 @@ export function CustomCursor() {
   const [isHovering, setIsHovering] = useState(false);
   const [isMobile, setIsMobile] = useState(true);
 
-  const springConfig = { damping: 22, stiffness: 280, mass: 0.5 };
+  // Premium physics: swift but buttery smooth damping
+  const springConfig = { damping: 28, stiffness: 300, mass: 0.2 };
   const cursorXSpring = useSpring(cursorX, springConfig);
   const cursorYSpring = useSpring(cursorY, springConfig);
 
@@ -38,33 +39,54 @@ export function CustomCursor() {
   return (
     <>
       <style>{`* { cursor: none !important; }`}</style>
-      {/* Large ring — trails behind */}
+      
+      {/* Premium Glass Ring */}
       <motion.div
-        className="fixed top-0 left-0 rounded-full pointer-events-none z-[9999]"
+        className="fixed top-0 left-0 rounded-full pointer-events-none z-[9999] flex items-center justify-center overflow-hidden"
         style={{
           x: cursorXSpring,
           y: cursorYSpring,
           translateX: "-50%",
           translateY: "-50%",
-          width: isHovering ? 48 : 32,
-          height: isHovering ? 48 : 32,
-          mixBlendMode: "difference",
-          backgroundColor: isHovering ? "white" : "transparent",
-          border: isHovering ? "none" : "1.5px solid rgba(255,255,255,0.9)",
-          transition: "width 0.25s ease, height 0.25s ease, background-color 0.25s ease, border 0.25s ease",
+          width: isHovering ? 56 : 36,
+          height: isHovering ? 56 : 36,
+          backgroundColor: isHovering ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)",
+          border: isHovering ? "1px solid rgba(255, 255, 255, 0.25)" : "1px solid rgba(255, 255, 255, 0.15)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          boxShadow: isHovering 
+            ? "0 10px 40px rgba(0, 0, 0, 0.12), inset 0 0 20px rgba(255, 255, 255, 0.15)" 
+            : "0 4px 16px rgba(0, 0, 0, 0.08), inset 0 0 10px rgba(255, 255, 255, 0.05)",
+          transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1), height 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease",
         }}
-      />
-      {/* Small dot — snaps instantly */}
+      >
+        {/* Subtle inner accent on hover */}
+        <AnimatePresence>
+          {isHovering && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.2 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.2 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)]"
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Crisp Center Dot */}
       <motion.div
-        className="fixed top-0 left-0 w-[5px] h-[5px] bg-white rounded-full pointer-events-none z-[9999]"
+        className="fixed top-0 left-0 rounded-full pointer-events-none z-[10000]"
         style={{
           x: cursorX,
           y: cursorY,
           translateX: "-50%",
           translateY: "-50%",
-          mixBlendMode: "difference",
-          opacity: isHovering ? 0 : 1,
-          transition: "opacity 0.15s ease",
+          width: isHovering ? 0 : 5,
+          height: isHovering ? 0 : 5,
+          backgroundColor: "#ffffff",
+          boxShadow: "0 0 8px rgba(255, 255, 255, 0.8)",
+          transition: "width 0.2s ease, height 0.2s ease",
         }}
       />
     </>
