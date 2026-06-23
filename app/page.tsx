@@ -172,7 +172,6 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
   return (
     <>
       <CustomCursor />
-      <FilmNoise />
       <AnimatePresence>
         {isOpen && (
           <motion.div key="backdrop" className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
