@@ -47,14 +47,11 @@ export function CustomCursor() {
           y: cursorYSpring,
           translateX: "-50%",
           translateY: "-50%",
-          width: isHovering ? 36 : 28,
-          height: isHovering ? 36 : 28,
-          border: isHovering
-            ? "1.5px solid rgba(255,255,255,0.9)"
-            : "1px solid rgba(255,255,255,0.45)",
+          width: isHovering ? 52 : 32,
+          height: isHovering ? 52 : 32,
+          border: isHovering ? "1px solid rgba(255,255,255,0)" : "1px solid rgba(255,255,255,0.25)",
           backgroundColor: isHovering ? "rgba(255,255,255,0.08)" : "transparent",
-          backdropFilter: isHovering ? "blur(2px)" : "none",
-          transition: "width 0.2s ease, height 0.2s ease, border 0.2s ease, background-color 0.2s ease",
+          transition: "width 0.3s cubic-bezier(0.22, 1, 0.36, 1), height 0.3s cubic-bezier(0.22, 1, 0.36, 1), border 0.3s ease, background-color 0.3s ease",
         }}
       />
 
@@ -66,11 +63,13 @@ export function CustomCursor() {
           y: cursorY,
           translateX: "-50%",
           translateY: "-50%",
-          width: isHovering ? 4 : 4,
-          height: isHovering ? 4 : 4,
+          width: 5,
+          height: 5,
           backgroundColor: "rgba(255,255,255,0.95)",
-          boxShadow: "0 0 6px rgba(255,255,255,0.5)",
-          opacity: 1,
+          boxShadow: "0 0 10px rgba(255,255,255,0.4)",
+          opacity: isHovering ? 0 : 1,
+          scale: isHovering ? 0 : 1,
+          transition: "opacity 0.2s ease, scale 0.2s ease",
         }}
       />
     </>
