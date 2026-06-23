@@ -161,8 +161,8 @@ function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => 
 // ─────────────────────────────────────────────────────────────────────────────
 //  NAVIGATION DRAWER
 // ─────────────────────────────────────────────────────────────────────────────
-function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
-  { isOpen: boolean; activeSection: string; onScrollTo: (id: string) => void; onClose: () => void }) {
+function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose, onReplayIntro }:
+  { isOpen: boolean; activeSection: string; onScrollTo: (id: string) => void; onClose: () => void; onReplayIntro: () => void }) {
   const navItems = [
     { id: "studio",    label: "3D Studio",       icon: "✦", desc: "Interactive Spline scenes" },
     { id: "mood",      label: "Mood & Lighting", icon: "◎", desc: "Color & atmosphere" },
@@ -219,7 +219,18 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
                 ))}
               </div>
             </nav>
-            <div className="px-6 py-4 border-t border-zinc-100">
+            <div className="px-6 py-4 border-t border-zinc-100 flex flex-col gap-3">
+              <motion.button
+                onClick={() => { onReplayIntro(); onClose(); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-900 transition-all group"
+                whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+              >
+                <span className="text-lg leading-none">✦</span>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-bold text-white tracking-wide">Replay Intro</span>
+                  <span className="text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors">Watch the neon sign again</span>
+                </div>
+              </motion.button>
               <p className="text-xs text-zinc-300 text-center">© 2026 3D Mood · Powered by Spline</p>
             </div>
           </motion.aside>
@@ -1333,6 +1344,12 @@ export default function ThreeDMoodApp() {
     setIntroCompleted(true);
   };
 
+  const handleReplayIntro = () => {
+    localStorage.removeItem("hasSeenIntro");
+    setIntroCompleted(false);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
   const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [criticMode,    setCriticMode]    = useState(false);
@@ -1449,7 +1466,8 @@ export default function ThreeDMoodApp() {
       </header>
 
       <NavigationDrawer isOpen={drawerOpen} activeSection={activeSection}
-        onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)} />
+        onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)}
+        onReplayIntro={handleReplayIntro} />
 
       {/* ── 3D Studio (Spline) ── */}
       <section ref={studioRef} id="studio" className="relative" style={{ height:"100vh" }}>
