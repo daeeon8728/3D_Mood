@@ -576,7 +576,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         <MagneticButton>
           <motion.button onClick={onTogglePresentation}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/30 hover:bg-yellow-500/10 transition-all shadow-[0_0_15px_rgba(234,179,8,0.15)]"
-            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}
+            style={{ background:"rgba(18,18,18,0.95)" }}
             whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
             <span>🌟</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Presentation Mode</span>
@@ -585,7 +585,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
         <button onClick={() => setPanelsOpen(p => ({...p, right: !p.right}))}
           className="lg:hidden px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white border border-white/[0.1] shadow-lg transition-all active:scale-95"
-          style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}>
+          style={{ background:"rgba(18,18,18,0.95)" }}>
           {panelsOpen.right ? "Hide Controls ⚙" : "Controls ⚙"}
         </button>
 
@@ -620,7 +620,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               {/* Capture Studio Button */}
               <motion.button onClick={handleCapture}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/[0.15] hover:bg-white/[0.08] transition-colors"
-                style={{ background:"rgba(255,255,255,0.05)", backdropFilter:"blur(24px)", boxShadow:"0 4px 24px rgba(0,0,0,0.2)" }}
+                style={{ background:"rgba(20,20,20,0.98)", boxShadow:"0 4px 24px rgba(0,0,0,0.2)" }}
                 whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
                 <span className="text-xl">📷</span>
                 <div className="flex flex-col items-start">
@@ -631,7 +631,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
               {/* Mood Presets */}
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl overflow-hidden border transition-all duration-500 border-white/[0.07]"
-                  style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
+                  style={{ background:"rgba(8,8,8,0.98)" }}>
                   <div className="px-4 pt-4 pb-2">
                     <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -712,7 +712,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
               {/* Status badge */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.06]"
-                style={{ background:"rgba(8,8,8,0.65)", backdropFilter:"blur(16px)" }}>
+                style={{ background:"rgba(8,8,8,0.98)" }}>
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isLoaded?"bg-emerald-400 animate-pulse":"bg-yellow-500 animate-ping"}`} />
                 <span className="text-[9px] font-semibold text-zinc-500">{isLoaded?"Scene loaded · Spline":"Loading scene…"}</span>
               </div>
@@ -734,7 +734,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
           {panelsOpen.left && (
             <motion.div initial={{ opacity:0, x:-20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:-20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
                  className="p-1.5 rounded-2xl flex flex-col gap-1.5 border border-white/[0.1] transition-all duration-500"
-                 style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
+                 style={{ background:"rgba(10,10,10,0.98)" }}>
               {SCENES.map((scene) => {
                 const active = currentSceneId === scene.id;
                 return (
@@ -780,7 +780,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         {presentationMode && (
           <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:30 }} transition={{ duration:0.6, ease:[0.22,1,0.36,1] }}
             className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border border-white/[0.15] shadow-2xl transition-all duration-500"
-            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
+            style={{ background:"rgba(10,10,10,0.98)" }}>
             <button onClick={() => { setZoomLevel(1); onLightingChange({...lighting, autoRotate:false}); }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
               Front View
@@ -1260,7 +1260,7 @@ function CriticPopover({ popover, onClose, onSubmit }:
   return (
     <motion.div key="critic-popover" variants={popoverVariants as any} initial="hidden" animate="visible" exit="exit"
       className="fixed z-50 w-72 rounded-2xl overflow-hidden shadow-2xl"
-      style={{ left, top, background:"rgba(8,8,8,0.97)", border:"1px solid rgba(255,255,255,0.1)", backdropFilter:"blur(24px)" }}>
+      style={{ left, top, background:"rgba(8,8,8,0.99)", border:"1px solid rgba(255,255,255,0.1)" }}>
       <form onSubmit={handleSubmit}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
           <div className="flex items-center gap-2">
@@ -1421,7 +1421,7 @@ export default function ThreeDMoodApp() {
       <div className={`min-h-screen bg-black overflow-x-hidden ${(presentationMode || !introCompleted) ? "h-screen overflow-hidden" : ""}`}>
         {/* ── Fixed Header ── */}
       <header className={`fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10 transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-        style={{ background:"rgba(0,0,0,0.78)", backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+        style={{ background:"rgba(0,0,0,0.95)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
         <motion.button onClick={() => scrollToSection("studio")}
           initial={{ opacity:0, x:-16 }} animate={{ opacity:1, x:0 }} transition={{ duration:0.5, ease:[0.22,1,0.36,1] }}
           className="flex items-center gap-3">

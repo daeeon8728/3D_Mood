@@ -117,93 +117,30 @@ export function FilmNoise() {
 }
 
 // ─── 3. Magnetic Wrapper ─────────────────────────────────────────────────────
-// Use as a <div> wrapper — does NOT add its own click handler
+// Lightweight: no spring physics — just a simple wrapper
 export function MagneticButton({ children, className, style }: {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const xSpring = useSpring(x, { damping: 12, stiffness: 120, mass: 0.1 });
-  const ySpring = useSpring(y, { damping: 12, stiffness: 120, mass: 0.1 });
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    x.set((e.clientX - rect.left - rect.width / 2) * 0.25);
-    y.set((e.clientY - rect.top - rect.height / 2) * 0.25);
-  }, [x, y]);
-
-  const handleMouseLeave = useCallback(() => {
-    x.set(0);
-    y.set(0);
-  }, [x, y]);
-
   return (
-    <motion.div
-      ref={ref}
-      data-magnetic
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{ x: xSpring, y: ySpring, ...style }}
-      className={className}
-    >
+    <div data-magnetic className={className} style={style}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
-// ─── 4. 3D Parallax Tilt Card ────────────────────────────────────────────────
+// ─── 4. Tilt Card (Lightweight) ──────────────────────────────────────────────
+// Physics removed for perf — CSS transition only
 export function TiltCard({ children, className, style }: {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-
-  const mouseXSpring = useSpring(x, { stiffness: 250, damping: 28 });
-  const mouseYSpring = useSpring(y, { stiffness: 250, damping: 28 });
-
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["8deg", "-8deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-8deg", "8deg"]);
-  const glareOpacity = useTransform(mouseXSpring, [-0.5, 0.5], [0, 0.15]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    x.set((e.clientX - rect.left) / rect.width - 0.5);
-    y.set((e.clientY - rect.top) / rect.height - 0.5);
-  }, [x, y]);
-
-  const handleMouseLeave = useCallback(() => {
-    x.set(0);
-    y.set(0);
-  }, [x, y]);
-
   return (
-    <motion.div
-      ref={ref}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{ rotateX, rotateY, transformStyle: "preserve-3d", perspective: 1000, ...style }}
-      className={className}
-    >
-      {/* Hologram Glare effect */}
-      <motion.div
-        className="absolute inset-0 rounded-3xl pointer-events-none z-10"
-        style={{
-          opacity: glareOpacity,
-          background: "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, transparent 60%)",
-        }}
-      />
-      <div style={{ transform: "translateZ(20px)" }}>
-        {children}
-      </div>
-    </motion.div>
+    <div className={className} style={style}>
+      {children}
+    </div>
   );
 }
 
@@ -277,7 +214,7 @@ export function DocentPanel({ preset, onCopy }: { preset: any; onCopy: (hex: str
       >
         <TiltCard
           className="relative w-full p-5 rounded-3xl border border-white/[0.08] overflow-hidden"
-          style={{ background: "rgba(8,8,8,0.72)", backdropFilter: "blur(28px)", boxShadow: `0 20px 60px rgba(0,0,0,0.6), 0 0 40px ${preset.accentColor}18` }}
+          style={{ background: "rgba(8,8,8,0.92)", boxShadow: `0 20px 60px rgba(0,0,0,0.6), 0 0 40px ${preset.accentColor}18` }}
         >
           {/* Subtle gradient line at top */}
           <div
