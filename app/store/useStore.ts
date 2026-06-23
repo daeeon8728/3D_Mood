@@ -22,6 +22,9 @@ export interface R3FMoodPreset {
   rotationSpeed: number
 }
 
+// ── 3D 히어로 도형 타입 ──────────────────────────────────────────────
+export type HeroShape = 'torusknot' | 'sphere' | 'box'
+
 // ── 이미지 팔레트 ─────────────────────────────────────────────────────────
 export interface Palette {
   /** 추출된 5개 hex 색상 (dominant → 보조 순) */
@@ -97,33 +100,34 @@ const darkenHex = (hex: string, factor: number): string => {
 
 // ── 스토어 타입 ───────────────────────────────────────────────────────────
 interface AppState {
-  // ── Engine ──────────────────────────────────────────────────────────────
+  // ── Engine ─────────────────────────────────────────────────────────────────
   viewMode: ViewMode
   toggleViewMode: () => void
   setViewMode: (mode: ViewMode) => void
 
-  // ── Mood ─────────────────────────────────────────────────────────────────
+  // ── Mood ──────────────────────────────────────────────────────────────────
   currentMoodId: string
   moodPresets: R3FMoodPreset[]
   setMood: (id: string) => void
 
-  // ── Image Upload + Palette ───────────────────────────────────────────────
-  /** 업로드된 이미지 Object URL (blob://) */
-  uploadedImage: string | null
-  /** colorthief로 추출한 팔레트 데이터 */
-  palette: Palette | null
+  // ── 3D Hero ───────────────────────────────────────────────────────────
+  heroShape: HeroShape
+  setHeroShape: (s: HeroShape) => void
+  /** 키 라이트 강도 (스토어독 슬라이더와 직결) */
+  keyIntensity: number
+  setKeyIntensity: (v: number) => void
 
+  // ── Image Upload + Palette ──────────────────────────────────────────────
+  uploadedImage: string | null
+  palette: Palette | null
   setUploadedImage: (url: string | null) => void
   setPalette: (p: Palette | null) => void
-
   /**
    * 팔레트 데이터를 받아 'custom-upload' 무드 프리셋을 생성하고
    * 즉시 활성화하는 핵심 액션.
    * — 조명 색상, 배경, 회전속도가 이미지 팔레트 기반으로 자동 계산됨.
    */
   applyPaletteToMood: (palette: Palette) => void
-
-  /** 이미지 초기화: URL 해제 + custom-upload 프리셋 제거 */
   clearImage: () => void
 }
 
@@ -134,18 +138,24 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   devtools(
     (set, get) => ({
-      // ── Engine ────────────────────────────────────────────────────────
+      // ── Engine ──────────────────────────────────────────────────────────
       viewMode: 'spline',
       toggleViewMode: () =>
         set((s) => ({ viewMode: s.viewMode === 'spline' ? 'custom' : 'spline' }), false, 'toggleViewMode'),
       setViewMode: (mode) => set({ viewMode: mode }, false, 'setViewMode'),
 
-      // ── Mood ──────────────────────────────────────────────────────────
+      // ── Mood ───────────────────────────────────────────────────────────────
       currentMoodId: 'cyberpunk',
       moodPresets: R3F_MOOD_PRESETS,
       setMood: (id) => set({ currentMoodId: id }, false, 'setMood'),
 
-      // ── Image / Palette ───────────────────────────────────────────────
+      // ── 3D Hero ───────────────────────────────────────────────────────────
+      heroShape: 'torusknot',
+      setHeroShape: (s) => set({ heroShape: s }, false, 'setHeroShape'),
+      keyIntensity: 120,
+      setKeyIntensity: (v) => set({ keyIntensity: v }, false, 'setKeyIntensity'),
+
+      // ── Image / Palette ──────────────────────────────────────────────────────
       uploadedImage: null,
       palette: null,
 

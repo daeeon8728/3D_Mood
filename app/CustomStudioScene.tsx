@@ -1,22 +1,6 @@
 /* eslint-disable */
 "use client";
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  CustomStudioScene v3 — Image-to-3D Sync Studio
-//
-//  핵심 기능:
-//  ① TexturedHeroMesh  : useLoader(TextureLoader, imageUrl) → meshPhysicalMaterial.map
-//                        → Suspense fallback: PlainHeroMesh (재질 전환 중 빈화면 방지)
-//  ② DynamicLights     : Zustand 팔레트 색상 → maath.easing.dampC 부드러운 보간
-//  ③ DynamicShadows    : palette.brightness → ContactShadows opacity 동적 조절
-//  ④ DynamicEnvLight   : palette.brightness → scene.environmentIntensity 동적 조절
-//  ⑤ ImageUploader UI  : 우측 하단 패널 (드랍존 + 팔레트 스와치)
-//  ⑥ Image thumbnail   : 우측 상단 Leva 패널 옆 48px 썸네일
-//
-//  Leva 테마: 라이트/미니멀 (elevation1: white계열)
-//  성능: React.memo, Zustand selector, dpr=[1,1.5], ACESFilmic ToneMapping
-// ─────────────────────────────────────────────────────────────────────────────
-
 import React, { useRef, useMemo, Suspense } from "react";
 import { Canvas, useFrame, useThree, useLoader } from "@react-three/fiber";
 import {
@@ -29,10 +13,9 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import { easing } from "maath";
-import { useControls, Leva, folder } from "leva";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAppStore, type R3FMoodPreset, type Palette } from "./store/useStore";
-import ImageUploader from "./ImageUploader";
+import { useAppStore, type R3FMoodPreset, type Palette, type HeroShape } from "./store/useStore";
+import StudioDock from "./StudioDock";
 
 // ── Zustand Selectors ─────────────────────────────────────────────────────
 const selectMoodId    = (s: any): string             => s.currentMoodId;
@@ -40,9 +23,11 @@ const selectPresets   = (s: any): R3FMoodPreset[]    => s.moodPresets;
 const selectSetMood   = (s: any)                     => s.setMood;
 const selectImageUrl  = (s: any): string | null      => s.uploadedImage;
 const selectPalette   = (s: any): Palette | null     => s.palette;
+const selectHeroShape = (s: any): HeroShape          => s.heroShape;
+const selectKeyInt    = (s: any): number             => s.keyIntensity;
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Scene Background — 무드/팔레트에 따라 배경색 보간
+//  Scene Background
 // ─────────────────────────────────────────────────────────────────────────────
 function SceneBackground() {
   const currentMoodId = useAppStore(selectMoodId);
@@ -63,8 +48,7 @@ function SceneBackground() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Dynamic Environment Intensity — 이미지 밝기에 따라 IBL 강도 조절
-//  밝은 이미지 → 강한 환경 반사 / 어두운 이미지 → 극적인 대비
+//  Dynamic Environment Intensity
 // ─────────────────────────────────────────────────────────────────────────────
 function DynamicEnvIntensity() {
   const { scene } = useThree();
@@ -72,7 +56,7 @@ function DynamicEnvIntensity() {
   useFrame(() => {
     const palette = useAppStore.getState().palette;
     const target  = palette
-      ? 0.5 + palette.brightness * 1.4   // 밝은 이미지: 최대 1.9
+      ? 0.5 + palette.brightness * 1.4
       : 1.0;
     scene.environmentIntensity = THREE.MathUtils.lerp(
       scene.environmentIntensity ?? 1.0,
@@ -84,18 +68,9 @@ function DynamicEnvIntensity() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Studio Lights — 삼각 조명 (Triangle Lighting)
-//  Fill/Rim 색상: Zustand 무드 프리셋(팔레트 기반) → maath.easing.dampC
+//  Studio Lights
 // ─────────────────────────────────────────────────────────────────────────────
-function StudioLights({
-  keyIntensity,
-  fillIntensity,
-  rimIntensity,
-}: {
-  keyIntensity: number;
-  fillIntensity: number;
-  rimIntensity: number;
-}) {
+function StudioLights({ keyIntensity }: { keyIntensity: number }) {
   const fillRef = useRef<THREE.PointLight>(null);
   const rimRef  = useRef<THREE.PointLight>(null);
 
@@ -106,9 +81,12 @@ function StudioLights({
     if (rimRef.current)  easing.dampC(rimRef.current.color,  preset.rimLightColor, 0.18, delta);
   });
 
+  // 하드코딩된 fill/rim intensity (Leva 제거됨)
+  const fillIntensity = 38;
+  const rimIntensity = 30;
+
   return (
     <>
-      {/* ① Key: 상단 스팟 — 메인 스튜디오 조명 */}
       <spotLight
         position={[0, 9, 5]}
         angle={Math.PI / 7}
@@ -123,102 +101,81 @@ function StudioLights({
         shadow-radius={8}
         color="#fffdf0"
       />
-      {/* ② Fill: 무드 색상 */}
       <pointLight ref={fillRef} position={[-5, 4, 3]} intensity={fillIntensity} color="#ff2079" distance={24} decay={2} />
-      {/* ③ Rim: 역광 */}
       <pointLight ref={rimRef}  position={[5, -2, -6]} intensity={rimIntensity} color="#00d4ff" distance={22} decay={2} />
-      {/* ④ Ambient: 드라마틱 대비를 위한 극소 베이스 */}
       <ambientLight intensity={0.05} color="#8899ff" />
     </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  PlainHeroMesh — 이미지 없을 때 또는 TexturedHeroMesh 로딩 중 fallback
+//  Geometry Switcher
 // ─────────────────────────────────────────────────────────────────────────────
-function PlainHeroMesh({
-  materialMode,
-  envMapIntensity,
-}: {
-  materialMode: string;
-  envMapIntensity: number;
-}) {
+function ShapeGeometry({ shape }: { shape: HeroShape }) {
+  switch (shape) {
+    case "torusknot":
+      return <torusKnotGeometry args={[1, 0.3, 256, 32, 2, 3]} />;
+    case "sphere":
+      return <sphereGeometry args={[1.2, 64, 64]} />;
+    case "box":
+      return <boxGeometry args={[1.8, 1.8, 1.8]} />;
+    default:
+      return <torusKnotGeometry args={[1, 0.3, 256, 32, 2, 3]} />;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PlainHeroMesh
+// ─────────────────────────────────────────────────────────────────────────────
+function PlainHeroMesh({ shape }: { shape: HeroShape }) {
   return (
     <mesh castShadow receiveShadow>
-      <torusKnotGeometry args={[1, 0.3, 256, 32, 2, 3]} />
-
-      {materialMode === "glass" && (
-        <MeshTransmissionMaterial
-          backside
-          samples={16}
-          resolution={512}
-          transmission={1}
-          roughness={0.04}
-          thickness={0.55}
-          ior={1.52}
-          chromaticAberration={0.45}
-          anisotropy={0.35}
-          distortion={0.5}
-          distortionScale={0.5}
-          temporalDistortion={0.12}
-          envMapIntensity={envMapIntensity}
-          color="#ffffff"
-          attenuationDistance={4}
-          attenuationColor="#b8d4ff"
-        />
-      )}
-      {materialMode === "metal" && (
-        <meshPhysicalMaterial
-          color="#dde4ee"
-          metalness={0.98}
-          roughness={0.03}
-          envMapIntensity={envMapIntensity}
-          clearcoat={1.0}
-          clearcoatRoughness={0.04}
-          iridescence={0.5}
-          iridescenceIOR={1.5}
-          iridescenceThicknessRange={[100, 400]}
-        />
-      )}
-      {materialMode === "chrome" && (
-        <meshPhysicalMaterial
-          color="#c8d4e8"
-          metalness={1.0}
-          roughness={0.0}
-          envMapIntensity={envMapIntensity * 1.6}
-          clearcoat={1.0}
-          clearcoatRoughness={0.0}
-        />
-      )}
+      <ShapeGeometry shape={shape} />
+      <MeshTransmissionMaterial
+        backside
+        samples={16}
+        resolution={512}
+        transmission={1}
+        roughness={0.04}
+        thickness={0.55}
+        ior={1.52}
+        chromaticAberration={0.45}
+        anisotropy={0.35}
+        distortion={0.5}
+        distortionScale={0.5}
+        temporalDistortion={0.12}
+        envMapIntensity={2.8}
+        color="#ffffff"
+        attenuationDistance={4}
+        attenuationColor="#b8d4ff"
+      />
     </mesh>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  TexturedHeroMesh — 업로드 이미지를 3D 표면에 실시간 매핑
-//  useLoader: Suspense 기반 — 로딩 중 PlainHeroMesh가 fallback으로 표시됨
+//  TexturedHeroMesh
 // ─────────────────────────────────────────────────────────────────────────────
-function TexturedHeroMesh({ imageUrl, envMapIntensity }: { imageUrl: string; envMapIntensity: number }) {
-  // useLoader: R3F 내장, Suspense 트리거, URL 키 기반 캐시
+function TexturedHeroMesh({ imageUrl, shape }: { imageUrl: string; shape: HeroShape }) {
   const texture = useLoader(THREE.TextureLoader, imageUrl);
 
-  // 텍스처 설정: 한 번만 실행 (texture 인스턴스 변경 시)
   useMemo(() => {
     texture.colorSpace  = THREE.SRGBColorSpace;
     texture.wrapS       = THREE.RepeatWrapping;
     texture.wrapT       = THREE.RepeatWrapping;
+    // 갤러리 액자처럼 매핑하기 위해 반복 및 오프셋 조정 가능 (추가 최적화)
+    texture.repeat.set(2, 1);
     texture.needsUpdate = true;
   }, [texture]);
 
   return (
     <mesh castShadow receiveShadow>
-      <torusKnotGeometry args={[1, 0.3, 256, 32, 2, 3]} />
-      {/* meshPhysicalMaterial: 텍스처 + 금속감 + 클리어코트 */}
+      <ShapeGeometry shape={shape} />
       <meshPhysicalMaterial
         map={texture}
         metalness={0.75}
         roughness={0.18}
-        envMapIntensity={envMapIntensity}
+        envMapIntensity={2.8}
         clearcoat={0.85}
         clearcoatRoughness={0.12}
         iridescence={0.2}
@@ -229,21 +186,17 @@ function TexturedHeroMesh({ imageUrl, envMapIntensity }: { imageUrl: string; env
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  HeroObject — 이미지 유무에 따라 TexturedHeroMesh or PlainHeroMesh
-//  Float + Group: 회전 로직을 공유 (텍스처 전환과 무관하게 계속 회전)
+//  HeroObject
 // ─────────────────────────────────────────────────────────────────────────────
 function HeroObject({
   imageUrl,
-  rotationSpeed,
-  materialMode,
-  envMapIntensity,
+  shape,
 }: {
   imageUrl: string | null;
-  rotationSpeed: number;
-  materialMode: string;
-  envMapIntensity: number;
+  shape: HeroShape;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const rotationSpeed = 0.5;
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
@@ -254,19 +207,16 @@ function HeroObject({
   return (
     <Float speed={1.3} rotationIntensity={0.1} floatIntensity={0.35}>
       <group ref={groupRef}>
-        {/* 이미지가 있으면 텍스처 메시, 없으면 재질 메시 */}
         {imageUrl ? (
-          // Suspense: useLoader가 로딩 중일 때 PlainHeroMesh 표시
-          <Suspense fallback={<PlainHeroMesh materialMode={materialMode} envMapIntensity={envMapIntensity} />}>
-            <TexturedHeroMesh imageUrl={imageUrl} envMapIntensity={envMapIntensity} />
+          <Suspense fallback={<PlainHeroMesh shape={shape} />}>
+            <TexturedHeroMesh imageUrl={imageUrl} shape={shape} />
           </Suspense>
         ) : (
-          <PlainHeroMesh materialMode={materialMode} envMapIntensity={envMapIntensity} />
+          <PlainHeroMesh shape={shape} />
         )}
 
-        {/* 와이어프레임 셸 (항상 표시 — 구조적 깊이감) */}
         <mesh>
-          <torusKnotGeometry args={[1.048, 0.305, 128, 32, 2, 3]} />
+          <ShapeGeometry shape={shape} />
           <meshBasicMaterial color="#ffffff" wireframe opacity={0.022} transparent />
         </mesh>
       </group>
@@ -276,11 +226,8 @@ function HeroObject({
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  DynamicContactShadows
-//  이미지 밝기(palette.brightness) → 그림자 불투명도 역비례
-//  어두운 이미지 → 짙은 그림자 / 밝은 이미지 → 옅은 그림자
 // ─────────────────────────────────────────────────────────────────────────────
 function DynamicContactShadows() {
-  // selector: brightness 값만 구독
   const brightness = useAppStore((s) => s.palette?.brightness ?? 0.5);
   const opacity    = 0.28 + (1 - brightness) * 0.55;
 
@@ -297,42 +244,23 @@ function DynamicContactShadows() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Canvas Inner Scene — 모든 R3F 컨텐츠를 묶음
+//  Canvas Inner Scene
 // ─────────────────────────────────────────────────────────────────────────────
 function StudioCanvasContent({
   keyIntensity,
-  fillIntensity,
-  rimIntensity,
-  rotationSpeed,
-  materialMode,
-  envMapIntensity,
-  envPreset,
+  shape,
   imageUrl,
 }: {
   keyIntensity: number;
-  fillIntensity: number;
-  rimIntensity: number;
-  rotationSpeed: number;
-  materialMode: string;
-  envMapIntensity: number;
-  envPreset: "city" | "studio" | "warehouse" | "dawn";
+  shape: HeroShape;
   imageUrl: string | null;
 }) {
   return (
     <>
       <SceneBackground />
       <DynamicEnvIntensity />
-      <StudioLights
-        keyIntensity={keyIntensity}
-        fillIntensity={fillIntensity}
-        rimIntensity={rimIntensity}
-      />
-      <HeroObject
-        imageUrl={imageUrl}
-        rotationSpeed={rotationSpeed}
-        materialMode={materialMode}
-        envMapIntensity={envMapIntensity}
-      />
+      <StudioLights keyIntensity={keyIntensity} />
+      <HeroObject imageUrl={imageUrl} shape={shape} />
       <DynamicContactShadows />
       <Grid
         renderOrder={-1}
@@ -355,13 +283,13 @@ function StudioCanvasContent({
         dampingFactor={0.05}
         makeDefault
       />
-      <Environment preset={envPreset} />
+      <Environment preset="city" />
     </>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Mood Selector Panel (React.memo)
+//  Mood Selector Panel
 // ─────────────────────────────────────────────────────────────────────────────
 const MoodSelectorPanel = React.memo(function MoodSelectorPanel() {
   const currentMoodId = useAppStore(selectMoodId);
@@ -418,7 +346,7 @@ const MoodSelectorPanel = React.memo(function MoodSelectorPanel() {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Studio Badge (React.memo)
+//  Studio Badge
 // ─────────────────────────────────────────────────────────────────────────────
 const StudioBadge = React.memo(function StudioBadge() {
   const palette = useAppStore(selectPalette);
@@ -457,117 +385,19 @@ const StudioBadge = React.memo(function StudioBadge() {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Image Thumbnail (우측 상단 — Leva 패널 옆)
-// ─────────────────────────────────────────────────────────────────────────────
-const ImageThumbnail = React.memo(function ImageThumbnail() {
-  const uploadedImage = useAppStore(selectImageUrl);
-  const palette       = useAppStore(selectPalette);
-
-  return (
-    <AnimatePresence>
-      {uploadedImage && (
-        <motion.div
-          key="thumb"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 600, damping: 40 }}
-          className="absolute z-30 overflow-hidden rounded-xl border shadow-2xl pointer-events-none"
-          style={{
-            top: "80px",
-            right: "258px",      // Leva 패널(245px) 왼쪽
-            width: "52px",
-            height: "52px",
-            borderColor: palette?.dominant ?? "rgba(255,255,255,0.2)",
-            boxShadow: palette?.dominant
-              ? `0 0 12px ${palette.dominant}60`
-              : "0 4px 20px rgba(0,0,0,0.4)",
-          }}
-        >
-          <img
-            src={uploadedImage}
-            alt="Uploaded"
-            className="w-full h-full object-cover"
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  Main Export
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CustomStudioScene() {
-  const imageUrl = useAppStore(selectImageUrl);
-
-  // ── Leva Controls (Canvas 외부 선언 — R3F 규칙) ──────────────────────
-  const {
-    keyIntensity,
-    fillIntensity,
-    rimIntensity,
-    rotationSpeed,
-    materialMode,
-    envMapIntensity,
-    envPreset,
-  } = useControls("Studio Mixer ✦", {
-    Lighting: folder(
-      {
-        keyIntensity:  { value: 120, min: 0, max: 600, step: 1,   label: "☀ Key"  },
-        fillIntensity: { value: 38,  min: 0, max: 250, step: 1,   label: "◐ Fill" },
-        rimIntensity:  { value: 30,  min: 0, max: 200, step: 1,   label: "◑ Rim"  },
-      },
-      { collapsed: false },
-    ),
-    Material: folder(
-      {
-        materialMode:    { options: ["metal", "glass", "chrome"], label: "⬡ Surface" },
-        envMapIntensity: { value: 2.8, min: 0, max: 6, step: 0.1, label: "Env Map ×" },
-      },
-      { collapsed: false },
-    ),
-    Scene: folder(
-      {
-        rotationSpeed: { value: 0.5, min: 0, max: 3, step: 0.01, label: "↻ Rotation" },
-        envPreset: {
-          options: { City: "city", Studio: "studio", Warehouse: "warehouse", Dawn: "dawn" },
-          label: "Environment",
-        },
-      },
-      { collapsed: true },
-    ),
-  });
+  const imageUrl     = useAppStore(selectImageUrl);
+  const heroShape    = useAppStore(selectHeroShape);
+  const keyIntensity = useAppStore(selectKeyInt);
 
   return (
     <div
       className="relative w-full h-full bg-black overflow-hidden"
       style={{ isolation: "isolate" }}
     >
-      {/* ── Leva: 라이트/미니멀 테마 ── */}
-      <Leva
-        collapsed={false}
-        theme={{
-          colors: {
-            elevation1: "rgba(252,252,255,0.97)",
-            elevation2: "rgba(244,244,250,0.97)",
-            elevation3: "rgba(234,234,246,0.97)",
-            accent1: "#1a1a2e",
-            accent2: "#2d2d4e",
-            accent3: "#5a5a8a",
-            highlight1: "#111111",
-            highlight2: "#444444",
-            highlight3: "#888888",
-            vivid1: "#7c3aed",
-          },
-          sizes: {
-            rootWidth: "245px",
-            controlWidth: "130px",
-          },
-          fontSizes: { root: "11px" },
-        }}
-      />
-
-      {/* ── R3F Canvas (DOM 먼저 배치 → UI 오버레이가 위에 렌더됨) ── */}
+      {/* ── R3F Canvas ── */}
       <div className="absolute inset-0">
         <Canvas
           shadows
@@ -583,34 +413,19 @@ export default function CustomStudioScene() {
           <Suspense fallback={null}>
             <StudioCanvasContent
               keyIntensity={keyIntensity}
-              fillIntensity={fillIntensity}
-              rimIntensity={rimIntensity}
-              rotationSpeed={rotationSpeed}
-              materialMode={materialMode}
-              envMapIntensity={envMapIntensity}
-              envPreset={envPreset as "city" | "studio" | "warehouse" | "dawn"}
+              shape={heroShape}
               imageUrl={imageUrl}
             />
           </Suspense>
         </Canvas>
       </div>
 
-      {/* ── UI 오버레이 (DOM 후배치 + z-index) ── */}
+      {/* ── UI 오버레이 ── */}
       <StudioBadge />
       <MoodSelectorPanel />
 
-      {/* 이미지 썸네일 (Leva 패널 옆, 우측 상단) */}
-      <ImageThumbnail />
-
-      {/* ImageUploader 패널 (우측 하단) */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="absolute bottom-10 right-5 z-20 w-52 pointer-events-auto"
-      >
-        <ImageUploader />
-      </motion.div>
+      {/* 하단 통합 도구 바 (StudioDock) */}
+      <StudioDock />
     </div>
   );
 }
