@@ -172,6 +172,7 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
   return (
     <>
       <CustomCursor />
+      <FilmNoise />
       <AnimatePresence>
         {isOpen && (
           <motion.div key="backdrop" className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
@@ -433,6 +434,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         ctx.fillStyle = gradRight;
         ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
       }
+
       const dataUrl = canvas2d.toDataURL("image/png", 1.0);
       if (dataUrl === "data:,") throw new Error("Blank image");
       
@@ -446,7 +448,13 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
     }
   };
 
-  // Removed CSS lighting overlays — Spline 3D API handles lighting directly
+  // Derived CSS values from lighting state
+  const overlayHex  = lighting.color;
+  const overlayAlpha= Math.round((lighting.intensity / 100) * 0.18 * 255).toString(16).padStart(2,"0");
+  const glowHex     = lighting.color;
+  const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
+
+  // Removed CSS filters completely to allow Spline 3D direct control
 
   const handleIntensityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newIntensity = parseInt(e.target.value);
@@ -495,7 +503,23 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
+      {/* ── Lighting Simulation Overlay ── */}
+      <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
+        style={{ 
+          background: `${overlayHex}${overlayAlpha}`, 
+          mixBlendMode: "screen" 
+        }} />
 
+      {/* ── Edge glow wings ── */}
+      <div className="absolute inset-0 pointer-events-none z-[11] transition-all duration-700" style={{
+        background: `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
+      }} />
+      <div className="absolute top-0 left-0 h-full w-[45%] pointer-events-none z-[11]" style={{
+        background: `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+      }} />
+      <div className="absolute top-0 right-0 h-full w-[45%] pointer-events-none z-[11]" style={{
+        background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+      }} />
 
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
@@ -503,8 +527,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         onContextMenu={e => e.preventDefault()}
         style={{ 
           transform: `scale(${zoomLevel})`, 
-          transition: "transform 0.5s ease-out",
-          willChange: "transform"
+          transition: "all 0.5s ease-out" 
         }}>
         {mounted && currentScene.type === "spline" && (
           <Spline
@@ -521,13 +544,17 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
             <motion.div key="loading" className="absolute inset-0 flex flex-col items-center justify-center z-20"
               style={{ backgroundColor: '#030303' }}
               initial={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:0.8 }}>
-              <div className="w-12 h-12 rounded-2xl border border-white/10 flex items-center justify-center mb-6"
-                style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <motion.div className="w-12 h-12 rounded-2xl border border-white/10 flex items-center justify-center mb-6"
+                style={{ background: `${glowHex}18` }}
+                animate={{ scale:[1,1.08,1], opacity:[0.5,1,0.5] }}
+                transition={{ duration:2, repeat:Infinity, ease:"easeInOut" }}>
                 <span className="text-xl">✦</span>
-              </div>
+              </motion.div>
               <p className="text-sm font-semibold text-white/50 tracking-widest uppercase">Loading 3D Scene…</p>
-              <div className="mt-4 w-32 h-1 bg-white/5 overflow-hidden rounded-full">
-                <div className="h-full rounded-full bg-white/20 animate-pulse" />
+              <div className="mt-4 w-32 h-px bg-white/5 overflow-hidden rounded-full">
+                <motion.div className="h-full rounded-full"
+                  style={{ background:`linear-gradient(90deg, ${glowHex}40, ${glowHex})` }}
+                  animate={{ x:["-100%","100%"] }} transition={{ duration:1.4, repeat:Infinity, ease:"easeInOut" }} />
               </div>
             </motion.div>
           )}
@@ -537,8 +564,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* ── Critic mode — transparent click capture overlay ── */}
       {criticMode && (
         <div className="absolute inset-0 z-20 cursor-crosshair" onClick={handleOverlayClick}>
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/15 border border-red-500/35 pointer-events-none"
-            style={{ background: 'rgba(40,10,10,0.95)' }}>
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/15 border border-red-500/35 backdrop-blur-md pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
             <span className="text-[11px] font-bold text-red-400 tracking-wider">CRITIC MODE — Click anywhere to annotate</span>
           </div>
@@ -551,7 +577,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         <MagneticButton>
           <motion.button onClick={onTogglePresentation}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-yellow-500/30 hover:bg-yellow-500/10 transition-all shadow-[0_0_15px_rgba(234,179,8,0.15)]"
-            style={{ background:"rgba(18,18,18,0.95)" }}
+            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}
             whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
             <span>🌟</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Presentation Mode</span>
@@ -560,7 +586,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
         <button onClick={() => setPanelsOpen(p => ({...p, right: !p.right}))}
           className="lg:hidden px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white border border-white/[0.1] shadow-lg transition-all active:scale-95"
-          style={{ background:"rgba(18,18,18,0.95)" }}>
+          style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(16px)" }}>
           {panelsOpen.right ? "Hide Controls ⚙" : "Controls ⚙"}
         </button>
 
@@ -595,7 +621,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
               {/* Capture Studio Button */}
               <motion.button onClick={handleCapture}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-white/[0.15] hover:bg-white/[0.08] transition-colors"
-                style={{ background:"rgba(20,20,20,0.98)", boxShadow:"0 4px 24px rgba(0,0,0,0.2)" }}
+                style={{ background:"rgba(255,255,255,0.05)", backdropFilter:"blur(24px)", boxShadow:"0 4px 24px rgba(0,0,0,0.2)" }}
                 whileHover={{ scale:1.02 }} whileTap={{ scale:0.96 }}>
                 <span className="text-xl">📷</span>
                 <div className="flex flex-col items-start">
@@ -606,22 +632,14 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
               {/* Mood Presets */}
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl overflow-hidden border transition-all duration-500 border-white/[0.07]"
-                  style={{ background:"rgba(8,8,8,0.98)" }}>
+                  style={{ background:"rgba(8,8,8,0.72)", backdropFilter:"blur(24px)" }}>
                   <div className="px-4 pt-4 pb-2">
                     <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Mood Presets</p>
                     <div className="grid grid-cols-2 gap-1.5">
                       {MOOD_PRESETS.map((p) => (
                         <MagneticButton key={p.id}>
                           <motion.button id={`preset-${p.id}`}
-                            onClick={() => {
-                              if (activePreset === p.id) {
-                                setActivePreset(null);
-                                onLightingChange({ intensity: 70, color: "#FFFFFF", autoRotate: false });
-                              } else {
-                                setActivePreset(p.id);
-                                onLightingChange(p.lighting);
-                              }
-                            }}
+                            onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
                             className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left w-full"
                             style={{
                               background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
@@ -687,7 +705,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
 
               {/* Status badge */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.06]"
-                style={{ background:"rgba(8,8,8,0.98)" }}>
+                style={{ background:"rgba(8,8,8,0.65)", backdropFilter:"blur(16px)" }}>
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isLoaded?"bg-emerald-400 animate-pulse":"bg-yellow-500 animate-ping"}`} />
                 <span className="text-[9px] font-semibold text-zinc-500">{isLoaded?"Scene loaded · Spline":"Loading scene…"}</span>
               </div>
@@ -709,7 +727,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
           {panelsOpen.left && (
             <motion.div initial={{ opacity:0, x:-20, scale:0.95 }} animate={{ opacity:1, x:0, scale:1 }} exit={{ opacity:0, x:-20, scale:0.95 }} transition={{ duration:0.4, ease:[0.22,1,0.36,1] }}
                  className="p-1.5 rounded-2xl flex flex-col gap-1.5 border border-white/[0.1] transition-all duration-500"
-                 style={{ background:"rgba(10,10,10,0.98)" }}>
+                 style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
               {SCENES.map((scene) => {
                 const active = currentSceneId === scene.id;
                 return (
@@ -755,7 +773,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         {presentationMode && (
           <motion.div initial={{ opacity:0, y:30 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:30 }} transition={{ duration:0.6, ease:[0.22,1,0.36,1] }}
             className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full border border-white/[0.15] shadow-2xl transition-all duration-500"
-            style={{ background:"rgba(10,10,10,0.98)" }}>
+            style={{ background:"rgba(10,10,10,0.6)", backdropFilter:"blur(32px)" }}>
             <button onClick={() => { setZoomLevel(1); onLightingChange({...lighting, autoRotate:false}); }}
               className="px-5 py-2.5 rounded-full text-xs font-bold text-white hover:bg-white/10 transition-colors">
               Front View
@@ -815,15 +833,7 @@ function MoodSection({ lighting, onChange, sectionRef }:
                 <motion.button key={preset.id} id={`mood-${preset.id}`}
                   initial="hidden" whileInView="visible" viewport={{ once:true, margin:"-50px" }}
                   variants={fadeUp as any} custom={i}
-                  onClick={() => {
-                    if (activePreset === preset.id) {
-                      setActivePreset(null);
-                      onChange({ intensity: 70, color: "#FFFFFF", autoRotate: false });
-                    } else {
-                      setActivePreset(preset.id);
-                      onChange(preset.lighting);
-                    }
-                  }}
+                  onClick={() => { setActivePreset(preset.id); onChange(preset.lighting); }}
                   className="relative rounded-2xl p-5 text-left border transition-all duration-300 overflow-hidden"
                   style={{ background:isActive?`linear-gradient(135deg,${preset.gradientFrom}25,${preset.gradientTo}15)`:"rgba(255,255,255,0.02)", borderColor:isActive?preset.accentColor+"50":"rgba(255,255,255,0.05)", boxShadow:isActive?`0 0 30px ${preset.accentColor}18`:"none" }}
                   whileHover={{ scale:1.02, y:-3 }} whileTap={{ scale:0.98 }}>
@@ -1235,7 +1245,7 @@ function CriticPopover({ popover, onClose, onSubmit }:
   return (
     <motion.div key="critic-popover" variants={popoverVariants as any} initial="hidden" animate="visible" exit="exit"
       className="fixed z-50 w-72 rounded-2xl overflow-hidden shadow-2xl"
-      style={{ left, top, background:"rgba(8,8,8,0.99)", border:"1px solid rgba(255,255,255,0.1)" }}>
+      style={{ left, top, background:"rgba(8,8,8,0.97)", border:"1px solid rgba(255,255,255,0.1)", backdropFilter:"blur(24px)" }}>
       <form onSubmit={handleSubmit}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
           <div className="flex items-center gap-2">
@@ -1396,7 +1406,7 @@ export default function ThreeDMoodApp() {
       <div className={`min-h-screen bg-black overflow-x-hidden ${(presentationMode || !introCompleted) ? "h-screen overflow-hidden" : ""}`}>
         {/* ── Fixed Header ── */}
       <header className={`fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10 transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-        style={{ background:"rgba(0,0,0,0.95)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+        style={{ background:"rgba(0,0,0,0.78)", backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
         <motion.button onClick={() => scrollToSection("studio")}
           initial={{ opacity:0, x:-16 }} animate={{ opacity:1, x:0 }} transition={{ duration:0.5, ease:[0.22,1,0.36,1] }}
           className="flex items-center gap-3">
