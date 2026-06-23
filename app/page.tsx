@@ -433,7 +433,6 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         ctx.fillStyle = gradRight;
         ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
       }
-
       const dataUrl = canvas2d.toDataURL("image/png", 1.0);
       if (dataUrl === "data:,") throw new Error("Blank image");
       
@@ -447,13 +446,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
     }
   };
 
-  // Derived CSS values from lighting state
-  const overlayHex  = lighting.color;
-  const overlayAlpha= Math.round((lighting.intensity / 100) * 0.18 * 255).toString(16).padStart(2,"0");
-  const glowHex     = lighting.color;
-  const glowAlpha   = Math.round((lighting.intensity / 100) * 0.7 * 255).toString(16).padStart(2,"0");
-
-  // Removed CSS filters completely to allow Spline 3D direct control
+  // Removed CSS lighting overlays — Spline 3D API handles lighting directly
 
   const handleIntensityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newIntensity = parseInt(e.target.value);
@@ -502,23 +495,7 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
-      {/* ── Lighting Simulation Overlay ── */}
-      <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
-        style={{ 
-          background: `${overlayHex}${overlayAlpha}`, 
-          mixBlendMode: "screen" 
-        }} />
 
-      {/* ── Edge glow wings ── */}
-      <div className="absolute inset-0 pointer-events-none z-[11] transition-all duration-700" style={{
-        background: `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
-      }} />
-      <div className="absolute top-0 left-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
-      }} />
-      <div className="absolute top-0 right-0 h-full w-[45%] pointer-events-none z-[11]" style={{
-        background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
-      }} />
 
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
@@ -526,7 +503,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
         onContextMenu={e => e.preventDefault()}
         style={{ 
           transform: `scale(${zoomLevel})`, 
-          transition: "all 0.5s ease-out" 
+          transition: "transform 0.5s ease-out",
+          willChange: "transform"
         }}>
         {mounted && currentScene.type === "spline" && (
           <Spline
@@ -543,17 +521,13 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
             <motion.div key="loading" className="absolute inset-0 flex flex-col items-center justify-center z-20"
               style={{ backgroundColor: '#030303' }}
               initial={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:0.8 }}>
-              <motion.div className="w-12 h-12 rounded-2xl border border-white/10 flex items-center justify-center mb-6"
-                style={{ background: `${glowHex}18` }}
-                animate={{ scale:[1,1.08,1], opacity:[0.5,1,0.5] }}
-                transition={{ duration:2, repeat:Infinity, ease:"easeInOut" }}>
+              <div className="w-12 h-12 rounded-2xl border border-white/10 flex items-center justify-center mb-6"
+                style={{ background: 'rgba(255,255,255,0.08)' }}>
                 <span className="text-xl">✦</span>
-              </motion.div>
+              </div>
               <p className="text-sm font-semibold text-white/50 tracking-widest uppercase">Loading 3D Scene…</p>
-              <div className="mt-4 w-32 h-px bg-white/5 overflow-hidden rounded-full">
-                <motion.div className="h-full rounded-full"
-                  style={{ background:`linear-gradient(90deg, ${glowHex}40, ${glowHex})` }}
-                  animate={{ x:["-100%","100%"] }} transition={{ duration:1.4, repeat:Infinity, ease:"easeInOut" }} />
+              <div className="mt-4 w-32 h-1 bg-white/5 overflow-hidden rounded-full">
+                <div className="h-full rounded-full bg-white/20 animate-pulse" />
               </div>
             </motion.div>
           )}
@@ -563,7 +537,8 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* ── Critic mode — transparent click capture overlay ── */}
       {criticMode && (
         <div className="absolute inset-0 z-20 cursor-crosshair" onClick={handleOverlayClick}>
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/15 border border-red-500/35 backdrop-blur-md pointer-events-none">
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/15 border border-red-500/35 pointer-events-none"
+            style={{ background: 'rgba(40,10,10,0.95)' }}>
             <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
             <span className="text-[11px] font-bold text-red-400 tracking-wider">CRITIC MODE — Click anywhere to annotate</span>
           </div>
