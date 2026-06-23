@@ -22,8 +22,9 @@ import { useAppStore } from './store/useStore';
 const Spline = dynamic(() => import("@splinetool/react-spline"), { 
   ssr: false, 
 });
-// Dual-Engine: Custom R3F Studio — 사용 시점에만 번들 로딩 (ssr:false = Three.js는 브라우저 전용)
-const CustomStudioScene = dynamic(() => import('./CustomStudioScene'), { ssr: false });
+// Dual-Engine: High-End R3F Studios
+const DepthStudioScene = dynamic(() => import('./DepthStudioScene'), { ssr: false });
+const MockupStudioScene = dynamic(() => import('./MockupStudioScene'), { ssr: false });
 
 // Force preserveDrawingBuffer to allow Spline canvas screenshotting
 if (typeof window !== "undefined") {
@@ -229,10 +230,11 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose, onReplay
             {/* ── Engine Mode Switcher ── */}
             <div className="px-6 py-5 border-t border-zinc-100">
               <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400 mb-3">Engine</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {([
                   { mode: 'spline' as const, icon: '✦', label: 'Showroom', sub: 'Spline 3D' },
-                  { mode: 'custom' as const, icon: '⬡', label: 'Studio',   sub: 'Custom R3F' },
+                  { mode: 'depth' as const,  icon: '🕳', label: 'Depth AI', sub: 'Parallax' },
+                  { mode: 'mockup' as const, icon: '✨', label: 'Material', sub: 'Finishes' },
                 ]).map(({ mode, icon, label, sub }) => (
                   <motion.button
                     key={mode}
@@ -1269,6 +1271,38 @@ function FeedbackSection({ sectionRef }: { sectionRef: React.RefObject<HTMLEleme
               )
           }
         </motion.div>
+
+        {/* Step 5: Experimental AI & Material Features */}
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once:true }}
+          variants={fadeUp as any} custom={0}
+          className="mt-20 border-t border-white/[0.04] pt-16">
+          <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-600 mb-2">Step 05</p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6">Experimental AI & Material Features</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="rounded-2xl p-8 border border-white/[0.04] bg-white/[0.015] hover:bg-white/[0.02] transition-colors flex flex-col items-start text-left">
+              <div className="w-12 h-12 rounded-xl border border-white/10 bg-black/50 shadow-inner flex items-center justify-center text-2xl mb-6">🕳</div>
+              <h3 className="text-xl font-bold text-white mb-3">AI Depth Parallax</h3>
+              <p className="text-sm text-zinc-400 leading-relaxed mb-6 flex-1">
+                Transform any flat 2D artwork into an interactive 3D space. Our local AI model instantly generates a depth map from your image, creating a stunning parallax effect that reacts to your mouse movement.
+              </p>
+              <button onClick={() => useAppStore.getState().setViewMode('depth')} className="text-xs font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-2 hover:text-emerald-300 transition-colors">
+                Try Depth AI <span>→</span>
+              </button>
+            </div>
+            
+            <div className="rounded-2xl p-8 border border-white/[0.04] bg-white/[0.015] hover:bg-white/[0.02] transition-colors flex flex-col items-start text-left">
+              <div className="w-12 h-12 rounded-xl border border-white/10 bg-black/50 shadow-inner flex items-center justify-center text-2xl mb-6">✨</div>
+              <h3 className="text-xl font-bold text-white mb-3">Material & Mockup Lab</h3>
+              <p className="text-sm text-zinc-400 leading-relaxed mb-6 flex-1">
+                Apply premium finishes to your designs. Experiment with holographic foil, glass dispersion, and realistic 3D device mockups right in your browser, using advanced WebGL shaders.
+              </p>
+              <button onClick={() => useAppStore.getState().setViewMode('mockup')} className="text-xs font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-2 hover:text-emerald-300 transition-colors">
+                Try Material Lab <span>→</span>
+              </button>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </section>
   );
@@ -1534,9 +1568,9 @@ export default function ThreeDMoodApp() {
                   onTogglePresentation={handleTogglePresentation}
                 />
               </motion.div>
-            ) : (
+            ) : viewMode === 'depth' ? (
               <motion.div
-                key="custom-engine"
+                key="depth-engine"
                 className="absolute inset-0"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1548,10 +1582,27 @@ export default function ThreeDMoodApp() {
                     <KineticLoading isVisible />
                   </div>
                 }>
-                  <CustomStudioScene />
+                  <DepthStudioScene />
                 </Suspense>
               </motion.div>
-            )}
+            ) : viewMode === 'mockup' ? (
+              <motion.div
+                key="mockup-engine"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={
+                  <div className="w-full h-full flex items-center justify-center bg-black">
+                    <KineticLoading isVisible />
+                  </div>
+                }>
+                  <MockupStudioScene />
+                </Suspense>
+              </motion.div>
+            ) : null}
           </AnimatePresence>
         </div>
       </section>

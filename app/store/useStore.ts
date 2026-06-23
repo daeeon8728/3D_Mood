@@ -87,7 +87,7 @@ export const R3F_MOOD_PRESETS: R3FMoodPreset[] = [
   },
 ]
 
-export type ViewMode = 'spline' | 'custom'
+export type ViewMode = 'spline' | 'depth' | 'mockup'
 
 // ── 헬퍼: hex 색상 어둡게 (배경색 생성용) ────────────────────────────────
 const darkenHex = (hex: string, factor: number): string => {
@@ -141,7 +141,7 @@ export const useAppStore = create<AppState>()(
       // ── Engine ──────────────────────────────────────────────────────────
       viewMode: 'spline',
       toggleViewMode: () =>
-        set((s) => ({ viewMode: s.viewMode === 'spline' ? 'custom' : 'spline' }), false, 'toggleViewMode'),
+        set((s) => ({ viewMode: s.viewMode === 'spline' ? 'depth' : 'spline' }), false, 'toggleViewMode'),
       setViewMode: (mode) => set({ viewMode: mode }, false, 'setViewMode'),
 
       // ── Mood ───────────────────────────────────────────────────────────────
