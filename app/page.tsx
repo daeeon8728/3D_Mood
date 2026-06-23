@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
-  useState, useEffect, useRef, useCallback, useMemo,
+  useState, useEffect, useRef, useCallback, useMemo, Suspense,
 } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import * as THREE from 'three';
@@ -17,10 +17,13 @@ import NeonSign from './NeonSign';
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 import { CustomCursor, MagneticButton, DocentPanel, KineticLoading, TiltCard } from "./HighEndUI";
+import { useAppStore } from './store/useStore';
 
 const Spline = dynamic(() => import("@splinetool/react-spline"), { 
   ssr: false, 
 });
+// Dual-Engine: Custom R3F Studio — 사용 시점에만 번들 로딩 (ssr:false = Three.js는 브라우저 전용)
+const CustomStudioScene = dynamic(() => import('./CustomStudioScene'), { ssr: false });
 
 // Force preserveDrawingBuffer to allow Spline canvas screenshotting
 if (typeof window !== "undefined") {
@@ -163,6 +166,9 @@ function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => 
 // ─────────────────────────────────────────────────────────────────────────────
 function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose, onReplayIntro }:
   { isOpen: boolean; activeSection: string; onScrollTo: (id: string) => void; onClose: () => void; onReplayIntro: () => void }) {
+  // Zustand selectors — viewMode/setViewMode만 구독, 다른 상태 변화엔 리렌더 안 함
+  const viewMode    = useAppStore((s) => s.viewMode);
+  const setViewMode = useAppStore((s) => s.setViewMode);
   const navItems = [
     { id: "studio",    label: "3D Studio",       icon: "✦", desc: "Interactive Spline scenes" },
     { id: "mood",      label: "Mood & Lighting", icon: "◎", desc: "Color & atmosphere" },
@@ -219,6 +225,36 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose, onReplay
                 ))}
               </div>
             </nav>
+
+            {/* ── Engine Mode Switcher ── */}
+            <div className="px-6 py-5 border-t border-zinc-100">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400 mb-3">Engine</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { mode: 'spline' as const, icon: '✦', label: 'Showroom', sub: 'Spline 3D' },
+                  { mode: 'custom' as const, icon: '⬡', label: 'Studio',   sub: 'Custom R3F' },
+                ]).map(({ mode, icon, label, sub }) => (
+                  <motion.button
+                    key={mode}
+                    onClick={() => { setViewMode(mode); onClose(); }}
+                    whileTap={{ scale: 0.97 }}
+                    className={`flex flex-col items-center gap-1.5 py-3.5 rounded-xl border transition-all ${
+                      viewMode === mode
+                        ? 'bg-black text-white border-zinc-700'
+                        : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50 hover:border-zinc-300'
+                    }`}
+                  >
+                    <span className="text-xl leading-none">{icon}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+                    <span className="text-[9px] text-zinc-400">{sub}</span>
+                    {viewMode === mode && (
+                      <motion.span layoutId="engine-indicator" className="w-1 h-1 rounded-full bg-white mt-0.5" />
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+
             <div className="px-6 py-4 border-t border-zinc-100 flex flex-col gap-3">
               <motion.button
                 onClick={() => { onReplayIntro(); onClose(); }}
@@ -1350,6 +1386,9 @@ export default function ThreeDMoodApp() {
     window.scrollTo({ top: 0, behavior: "instant" });
   };
 
+  // Dual-Engine: viewMode를 Zustand에서 직접 구독 (prop drilling 없음)
+  const viewMode = useAppStore((s) => s.viewMode);
+
   const [presentationMode, setPresentationMode] = useState(false);
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [criticMode,    setCriticMode]    = useState(false);
@@ -1469,21 +1508,51 @@ export default function ThreeDMoodApp() {
         onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)}
         onReplayIntro={handleReplayIntro} />
 
-      {/* ── 3D Studio (Spline) ── */}
+      {/* ── 3D Studio (Dual-Engine: Spline 쇼룸 ↔ Custom R3F 작업실) ── */}
       <section ref={studioRef} id="studio" className="relative" style={{ height:"100vh" }}>
         <div className="sticky top-16 w-full" style={{ height:"calc(100vh - 64px)" }}>
-          <SplineHero
-            currentSceneId={currentSceneId}
-            onSceneChange={setCurrentSceneId}
-            lighting={lighting}
-            onLightingChange={setLighting}
-            criticMode={criticMode}
-            onCanvasClick={(x,y,cx,cy) => {
-              if (criticMode) setPopover({ visible:true, x:cx+12, y:cy-20, canvasX:x, canvasY:y });
-            }}
-            presentationMode={presentationMode}
-            onTogglePresentation={handleTogglePresentation}
-          />
+          <AnimatePresence mode="wait">
+            {viewMode === 'spline' ? (
+              <motion.div
+                key="spline-engine"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <SplineHero
+                  currentSceneId={currentSceneId}
+                  onSceneChange={setCurrentSceneId}
+                  lighting={lighting}
+                  onLightingChange={setLighting}
+                  criticMode={criticMode}
+                  onCanvasClick={(x,y,cx,cy) => {
+                    if (criticMode) setPopover({ visible:true, x:cx+12, y:cy-20, canvasX:x, canvasY:y });
+                  }}
+                  presentationMode={presentationMode}
+                  onTogglePresentation={handleTogglePresentation}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="custom-engine"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={
+                  <div className="w-full h-full flex items-center justify-center bg-black">
+                    <KineticLoading isVisible />
+                  </div>
+                }>
+                  <CustomStudioScene />
+                </Suspense>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </section>
 
