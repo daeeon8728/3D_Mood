@@ -2,23 +2,17 @@
 
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Environment, Float, Text3D, Center } from "@react-three/drei";
+import { OrbitControls, Environment, Float, Text, Center } from "@react-three/drei";
 
 function PlaceholderContent() {
   return (
     <>
       <Float speed={2} rotationIntensity={0.5} floatIntensity={1}>
         <Center>
-          <Text3D
-            font="/fonts/Inter_Bold.json"
-            size={0.8}
-            height={0.2}
-            curveSegments={12}
-            bevelEnabled
-            bevelThickness={0.05}
-            bevelSize={0.02}
-            bevelOffset={0}
-            bevelSegments={5}
+          <Text
+            fontSize={0.8}
+            anchorX="center"
+            anchorY="middle"
           >
             Material Lab
             <meshPhysicalMaterial 
@@ -30,7 +24,7 @@ function PlaceholderContent() {
               iridescence={1}
               iridescenceIOR={1.5}
             />
-          </Text3D>
+          </Text>
         </Center>
       </Float>
       
