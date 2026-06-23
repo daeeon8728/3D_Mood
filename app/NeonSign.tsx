@@ -480,7 +480,7 @@ export default function NeonSign({ onExplore }: { onExplore?: (remember: boolean
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, delay: 2.5 }}
+                transition={{ duration: 0.5 }}
                 className="absolute bottom-5 right-6 z-20 text-[9px] text-zinc-600 hover:text-zinc-400 tracking-widest uppercase font-light transition-colors duration-200 cursor-pointer"
                 style={{ letterSpacing: "0.18em" }}
               >

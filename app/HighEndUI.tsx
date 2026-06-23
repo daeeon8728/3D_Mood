@@ -38,7 +38,8 @@ export function CustomCursor() {
   return (
     <>
       <style>{`* { cursor: none !important; }`}</style>
-      {/* Large ring — trails behind */}
+
+      {/* Outer ring — trails softly */}
       <motion.div
         className="fixed top-0 left-0 rounded-full pointer-events-none z-[9999]"
         style={{
@@ -46,25 +47,30 @@ export function CustomCursor() {
           y: cursorYSpring,
           translateX: "-50%",
           translateY: "-50%",
-          width: isHovering ? 48 : 32,
-          height: isHovering ? 48 : 32,
-          mixBlendMode: "difference",
-          backgroundColor: isHovering ? "white" : "transparent",
-          border: isHovering ? "none" : "1.5px solid rgba(255,255,255,0.9)",
-          transition: "width 0.25s ease, height 0.25s ease, background-color 0.25s ease, border 0.25s ease",
+          width: isHovering ? 36 : 28,
+          height: isHovering ? 36 : 28,
+          border: isHovering
+            ? "1.5px solid rgba(255,255,255,0.9)"
+            : "1px solid rgba(255,255,255,0.45)",
+          backgroundColor: isHovering ? "rgba(255,255,255,0.08)" : "transparent",
+          backdropFilter: isHovering ? "blur(2px)" : "none",
+          transition: "width 0.2s ease, height 0.2s ease, border 0.2s ease, background-color 0.2s ease",
         }}
       />
-      {/* Small dot — snaps instantly */}
+
+      {/* Inner dot — snaps instantly */}
       <motion.div
-        className="fixed top-0 left-0 w-[5px] h-[5px] bg-white rounded-full pointer-events-none z-[9999]"
+        className="fixed top-0 left-0 rounded-full pointer-events-none z-[9999]"
         style={{
           x: cursorX,
           y: cursorY,
           translateX: "-50%",
           translateY: "-50%",
-          mixBlendMode: "difference",
-          opacity: isHovering ? 0 : 1,
-          transition: "opacity 0.15s ease",
+          width: isHovering ? 4 : 4,
+          height: isHovering ? 4 : 4,
+          backgroundColor: "rgba(255,255,255,0.95)",
+          boxShadow: "0 0 6px rgba(255,255,255,0.5)",
+          opacity: 1,
         }}
       />
     </>
@@ -268,7 +274,7 @@ export function DocentPanel({ preset, onCopy }: { preset: any; onCopy: (hex: str
         animate={{ opacity: 1, x: 0, scale: 1 }}
         exit={{ opacity: 0, x: -24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed bottom-8 left-8 z-[40] w-64 pointer-events-auto"
+        className="fixed bottom-8 right-8 z-[40] w-64 pointer-events-auto"
       >
         <TiltCard
           className="relative w-full p-5 rounded-3xl border border-white/[0.08] overflow-hidden"

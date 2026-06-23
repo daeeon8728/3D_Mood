@@ -639,7 +639,15 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                       {MOOD_PRESETS.map((p) => (
                         <MagneticButton key={p.id}>
                           <motion.button id={`preset-${p.id}`}
-                            onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
+                            onClick={() => {
+                              if (activePreset === p.id) {
+                                setActivePreset(null);
+                                onLightingChange({ intensity: 70, color: "#FFFFFF", autoRotate: false });
+                              } else {
+                                setActivePreset(p.id);
+                                onLightingChange(p.lighting);
+                              }
+                            }}
                             className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left w-full"
                             style={{
                               background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
@@ -833,7 +841,15 @@ function MoodSection({ lighting, onChange, sectionRef }:
                 <motion.button key={preset.id} id={`mood-${preset.id}`}
                   initial="hidden" whileInView="visible" viewport={{ once:true, margin:"-50px" }}
                   variants={fadeUp as any} custom={i}
-                  onClick={() => { setActivePreset(preset.id); onChange(preset.lighting); }}
+                  onClick={() => {
+                    if (activePreset === preset.id) {
+                      setActivePreset(null);
+                      onChange({ intensity: 70, color: "#FFFFFF", autoRotate: false });
+                    } else {
+                      setActivePreset(preset.id);
+                      onChange(preset.lighting);
+                    }
+                  }}
                   className="relative rounded-2xl p-5 text-left border transition-all duration-300 overflow-hidden"
                   style={{ background:isActive?`linear-gradient(135deg,${preset.gradientFrom}25,${preset.gradientTo}15)`:"rgba(255,255,255,0.02)", borderColor:isActive?preset.accentColor+"50":"rgba(255,255,255,0.05)", boxShadow:isActive?`0 0 30px ${preset.accentColor}18`:"none" }}
                   whileHover={{ scale:1.02, y:-3 }} whileTap={{ scale:0.98 }}>
