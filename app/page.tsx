@@ -502,6 +502,24 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
       {/* CSS keyframe for auto-rotate fallback */}
       <style>{`@keyframes splineRotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>
 
+      {/* ── Lighting Simulation Overlay ── */}
+      <div className="absolute inset-0 pointer-events-none z-10 transition-all duration-700"
+        style={{ 
+          background: `${overlayHex}${overlayAlpha}`, 
+          mixBlendMode: "screen" 
+        }} />
+
+      {/* ── Edge glow wings ── */}
+      <div className="absolute inset-0 pointer-events-none z-[11] transition-all duration-700" style={{
+        background: `radial-gradient(ellipse 110% 90% at 50% 0%, ${glowHex}${glowAlpha} 0%, ${glowHex}22 35%, transparent 68%)`,
+      }} />
+      <div className="absolute top-0 left-0 h-full w-[45%] pointer-events-none z-[11]" style={{
+        background: `radial-gradient(ellipse 100% 80% at 0% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+      }} />
+      <div className="absolute top-0 right-0 h-full w-[45%] pointer-events-none z-[11]" style={{
+        background: `radial-gradient(ellipse 100% 80% at 100% 45%, ${glowHex}${Math.round(parseInt(glowAlpha,16)*0.45).toString(16).padStart(2,"0")} 0%, transparent 70%)`,
+      }} />
+
       {/* ── Spline viewer ── */}
       <div ref={containerRef}
         className="absolute inset-0 z-0"
@@ -621,7 +639,15 @@ function SplineHero({ currentSceneId, onSceneChange, lighting, onLightingChange,
                       {MOOD_PRESETS.map((p) => (
                         <MagneticButton key={p.id}>
                           <motion.button id={`preset-${p.id}`}
-                            onClick={() => { setActivePreset(p.id); onLightingChange(p.lighting); }}
+                            onClick={() => { 
+                              if (activePreset === p.id) {
+                                setActivePreset(null);
+                                onLightingChange({ intensity: 0, color: "#000000", autoRotate: false });
+                              } else {
+                                setActivePreset(p.id);
+                                onLightingChange(p.lighting);
+                              }
+                            }}
                             className="relative flex flex-col items-start px-2.5 py-2 rounded-xl transition-all border text-left w-full"
                             style={{
                               background: activePreset===p.id ? `linear-gradient(135deg,${p.gradientFrom}22,${p.gradientTo}14)` : "rgba(255,255,255,0.02)",
