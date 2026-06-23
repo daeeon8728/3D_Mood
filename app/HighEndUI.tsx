@@ -246,11 +246,11 @@ export function DocentPanel({ preset, onCopy }: { preset: any; onCopy: (hex: str
     <AnimatePresence mode="wait">
       <motion.div
         key={preset.id}
-        initial={{ opacity: 0, x: 24, scale: 0.96 }}
+        initial={{ opacity: 0, x: -24, scale: 0.96 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
-        exit={{ opacity: 0, x: 24, scale: 0.96 }}
+        exit={{ opacity: 0, x: -24, scale: 0.96 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed bottom-8 right-8 z-[40] w-64 pointer-events-auto"
+        className="fixed bottom-6 lg:bottom-16 left-[260px] z-[40] w-64 pointer-events-auto"
       >
         <TiltCard
           className="relative w-full p-5 rounded-3xl border border-white/[0.08] overflow-hidden"
