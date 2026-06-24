@@ -217,8 +217,15 @@ async function readPalette(file) {
   };
 }
 
+const SHAPE_OPTIONS = [
+  { id: "sphere",    label: "Sphere",    icon: "●" },
+  { id: "box",       label: "Box",       icon: "■" },
+  { id: "torusknot", label: "Knot",      icon: "✦" },
+];
+
 function StudioDock({ onCapture }) {
   const inputRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
   const uploadedImage = useAppStore((s) => s.uploadedImage);
   const palette = useAppStore((s) => s.palette);
   const clearImage = useAppStore((s) => s.clearImage);
@@ -227,23 +234,31 @@ function StudioDock({ onCapture }) {
   const currentMoodId = useAppStore((s) => s.currentMoodId);
   const moodPresets = useAppStore((s) => s.moodPresets);
   const setMood = useAppStore((s) => s.setMood);
+  const heroShape = useAppStore((s) => s.heroShape);
+  const setHeroShape = useAppStore((s) => s.setHeroShape);
 
   const colors = palette?.colors?.length ? palette.colors : DEFAULT_COLORS;
 
-  const handleFile = async (event) => {
-    const file = event.target.files?.[0];
+  const processFile = async (file) => {
     if (!file || !file.type.startsWith("image/")) return;
-
     const previousImage = useAppStore.getState().uploadedImage;
     if (previousImage?.startsWith("blob:")) URL.revokeObjectURL(previousImage);
-
     const imageUrl = URL.createObjectURL(file);
     setUploadedImage(imageUrl);
-
     const nextPalette = await readPalette(file);
     if (nextPalette) applyPaletteToMood(nextPalette);
+  };
 
+  const handleFile = async (event) => {
+    await processFile(event.target.files?.[0]);
     event.target.value = "";
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    await processFile(file);
   };
 
   const copyColor = (hex) => {
@@ -256,7 +271,22 @@ function StudioDock({ onCapture }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       className="absolute bottom-6 left-1/2 z-30 w-[min(960px,calc(100vw-32px))] -translate-x-1/2"
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
     >
+      {/* Drag overlay hint */}
+      <AnimatePresence>
+        {dragging && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 rounded-2xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/10 flex items-center justify-center pointer-events-none"
+          >
+            <p className="text-sm font-bold text-emerald-400 tracking-widest uppercase">Drop image here</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div
         className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-2xl"
         style={{
@@ -267,15 +297,14 @@ function StudioDock({ onCapture }) {
             : "0 18px 60px rgba(0,0,0,0.45)",
         }}
       >
+        {/* Upload + Thumbnail */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="h-11 rounded-xl border border-white/10 bg-white/10 px-4 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-white/15"
+          <label
+            className="h-11 rounded-xl border border-white/10 bg-white/10 px-4 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-white/15 flex items-center gap-2 cursor-pointer"
           >
-            Upload
-          </button>
-          <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handleFile} />
+            <span>🖼️</span> Upload
+            <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handleFile} />
+          </label>
 
           <AnimatePresence mode="popLayout">
             {uploadedImage && (
@@ -287,11 +316,8 @@ function StudioDock({ onCapture }) {
                 className="group relative h-12 w-12 overflow-hidden rounded-xl border border-white/15"
               >
                 <img src={uploadedImage} alt="Uploaded artwork" className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  className="absolute inset-0 bg-black/55 text-[10px] font-bold uppercase tracking-widest text-white opacity-0 transition group-hover:opacity-100"
-                >
+                <button type="button" onClick={clearImage}
+                  className="absolute inset-0 bg-black/55 text-[10px] font-bold uppercase tracking-widest text-white opacity-0 transition group-hover:opacity-100">
                   Clear
                 </button>
               </motion.div>
@@ -299,7 +325,29 @@ function StudioDock({ onCapture }) {
           </AnimatePresence>
         </div>
 
-        <div className="flex min-w-[220px] flex-1 items-center justify-center gap-2">
+        {/* Shape Selector */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-600 mr-1">Shape</span>
+          {SHAPE_OPTIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              title={s.label}
+              onClick={() => setHeroShape(s.id)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition ${
+                heroShape === s.id
+                  ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-300"
+                  : "border-white/10 bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <span>{s.icon}</span>
+              <span className="text-[10px] uppercase tracking-widest">{s.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Mood Presets */}
+        <div className="flex items-center gap-1.5">
           {moodPresets.slice(0, 5).map((preset) => (
             <button
               key={preset.id}
@@ -316,6 +364,7 @@ function StudioDock({ onCapture }) {
           ))}
         </div>
 
+        {/* Palette + Capture */}
         <div className="flex items-center gap-2">
           {colors.slice(0, 5).map((hex) => (
             <button
@@ -332,7 +381,7 @@ function StudioDock({ onCapture }) {
             onClick={onCapture}
             className="ml-1 h-11 rounded-xl border border-emerald-400/35 bg-emerald-400/15 px-4 text-xs font-bold uppercase tracking-widest text-emerald-200 transition hover:bg-emerald-400/25"
           >
-            Capture
+            ⬇ Capture
           </button>
         </div>
       </div>
