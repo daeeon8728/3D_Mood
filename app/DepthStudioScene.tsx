@@ -156,13 +156,23 @@ export default function DepthStudioScene() {
 
       // First time: load the transformers library + model
       if (!pipelineRef.current) {
-        setLoadingMsg("DOWNLOADING AI MODEL...");
+        setLoadingMsg("INITIALIZING LOCAL AI...");
 
         // Dynamically import to avoid SSR issues
-        const { pipeline, env } = await import('@xenova/transformers');
+        const transformers = await import('@xenova/transformers');
+        const env = transformers.env;
+        const pipeline = transformers.pipeline;
 
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
+        if (env) {
+          // Force 100% local execution
+          env.allowLocalModels = true;
+          env.allowRemoteModels = false;
+          env.localModelPath = '/model/'; // Points to /public/model/
+          env.useBrowserCache = false; // Disable indexDB cache since files are local
+          if (env.backends?.onnx?.wasm) {
+            env.backends.onnx.wasm.wasmPaths = '/onnx/'; // Points to /public/onnx/
+          }
+        }
 
         pipelineRef.current = await pipeline(
           'depth-estimation',
@@ -180,7 +190,8 @@ export default function DepthStudioScene() {
 
       setLoadingMsg("ESTIMATING DEPTH...");
       
-      const { RawImage } = await import('@xenova/transformers');
+      const transformers = await import('@xenova/transformers');
+      const RawImage = transformers.RawImage;
       const image = await RawImage.read(imageUrl);
       
       const output = await pipelineRef.current(image);
