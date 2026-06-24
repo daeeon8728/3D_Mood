@@ -143,6 +143,7 @@ export default function DepthStudioScene() {
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [downloadItem, setDownloadItem] = useState<string>("");
   const [intensity, setIntensity] = useState<number>(0.06);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
 
   // Initialize Worker
@@ -161,10 +162,11 @@ export default function DepthStudioScene() {
       } else if (status === "complete") {
         setDepthData({ data, width, height, channels });
         setIsProcessing(false);
+        setErrorMsg(null);
       } else if (status === "error") {
         console.error("Depth AI Error:", message);
         setIsProcessing(false);
-        setLoadingMsg("Error generating depth map.");
+        setErrorMsg(message || 'Unknown error');
       }
     };
     return () => {
@@ -178,6 +180,7 @@ export default function DepthStudioScene() {
       setDepthData(null);
       setIsProcessing(true);
       setDownloadProgress(0);
+      setErrorMsg(null);
       setLoadingMsg("INITIALIZING AI MODEL...");
       workerRef.current.postMessage({ imageUrl: uploadedImage });
     } else {
@@ -251,8 +254,25 @@ export default function DepthStudioScene() {
         )}
       </AnimatePresence>
 
+      {/* ── Error Overlay ── */}
+      {errorMsg && !isProcessing && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md pointer-events-none">
+          <div className="w-16 h-16 rounded-2xl border border-red-500/30 flex items-center justify-center mb-6 bg-red-500/10">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <p className="text-sm font-bold text-red-400 tracking-widest uppercase mb-3">AI Error</p>
+          <p className="text-[10px] font-mono text-zinc-400 text-center max-w-[280px] bg-zinc-900/80 rounded-xl p-3 leading-relaxed">{errorMsg}</p>
+          <button
+            className="mt-4 pointer-events-auto px-5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 border border-white/10 transition-colors"
+            onClick={() => { setErrorMsg(null); useAppStore.setState({ uploadedImage: null }); }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {/* ── Help Text if empty ── */}
-      {!uploadedImage && !isProcessing && (
+      {!uploadedImage && !isProcessing && !errorMsg && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
           <div className="w-16 h-16 rounded-2xl border border-emerald-500/30 flex items-center justify-center mb-6 bg-emerald-500/10">
             <span className="text-3xl">🕳</span>

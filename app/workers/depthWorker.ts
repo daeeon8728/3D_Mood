@@ -4,13 +4,20 @@ import { pipeline, env } from '@xenova/transformers';
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
-// CRITICAL FIX: Prevent hanging on Windows/Chrome without SharedArrayBuffer
+// WASM backend config – single thread, no proxy, local WASM files
 if (env.backends?.onnx?.wasm) {
   env.backends.onnx.wasm.numThreads = 1;
   env.backends.onnx.wasm.proxy = false;
-  // Point to our locally served WASM files (copied to /public/onnx during build)
   env.backends.onnx.wasm.wasmPaths = '/onnx/';
 }
+
+// ── Forward ALL unhandled errors from the worker back to main thread ──
+self.addEventListener('error', (e: ErrorEvent) => {
+  self.postMessage({ status: 'error', message: e.message });
+});
+self.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
+  self.postMessage({ status: 'error', message: String(e.reason) });
+});
 
 class PipelineSingleton {
   static task: any = 'depth-estimation';
@@ -19,12 +26,8 @@ class PipelineSingleton {
 
   static async getInstance(progress_callback: any = null) {
     if (this.instance === null) {
-      try {
-        this.instance = await pipeline(this.task, this.model, { progress_callback });
-      } catch (err: any) {
-        console.error("Pipeline initialization failed:", err);
-        throw err;
-      }
+      self.postMessage({ status: 'loading', message: 'LOADING AI MODEL...' });
+      this.instance = await pipeline(this.task, this.model, { progress_callback });
     }
     return this.instance;
   }
@@ -35,22 +38,18 @@ self.addEventListener('message', async (event) => {
     const { imageUrl } = event.data;
     if (!imageUrl) return;
 
-    self.postMessage({ status: 'loading', message: 'Loading AI model...' });
-
     const depthEstimator = await PipelineSingleton.getInstance((x: any) => {
-      // x is an object: { status: 'progress' | 'download' | 'initiate' | 'done', progress: number, file: string }
-      self.postMessage({ status: 'progress', data: x });
+      // Forward every progress tick (download progress, initiate, done...)
+      if (x && typeof x.progress === 'number') {
+        self.postMessage({ status: 'progress', data: x });
+      }
     });
 
-    self.postMessage({ status: 'processing', message: 'Estimating depth...' });
+    self.postMessage({ status: 'processing', message: 'ESTIMATING DEPTH...' });
 
-    // Run depth estimation
     const output = await depthEstimator(imageUrl);
-    const depthImage = output.depth; // RawImage
-    
-    // Convert to a regular array or clone the buffer for transferring
-    // The data is likely a Uint8ClampedArray or Uint8Array. 
-    // We can transfer it for performance
+    const depthImage = output.depth;
+
     const dataBuffer = depthImage.data.slice(0).buffer;
     const _self = self as unknown as Worker;
     _self.postMessage({
@@ -59,10 +58,10 @@ self.addEventListener('message', async (event) => {
       height: depthImage.height,
       channels: depthImage.channels,
       data: dataBuffer
-    }, [dataBuffer]); // Transferable object
+    }, [dataBuffer]);
 
   } catch (err: any) {
-    console.error(err);
-    self.postMessage({ status: 'error', message: err?.message || 'Error running depth estimation' });
+    console.error('[DepthWorker]', err);
+    self.postMessage({ status: 'error', message: err?.message || String(err) });
   }
 });
