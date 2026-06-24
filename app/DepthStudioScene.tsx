@@ -171,6 +171,8 @@ export default function DepthStudioScene() {
           env.useBrowserCache = false; // Disable indexDB cache since files are local
           if (env.backends?.onnx?.wasm) {
             env.backends.onnx.wasm.wasmPaths = '/onnx/'; // Points to /public/onnx/
+            env.backends.onnx.wasm.numThreads = 1;
+            env.backends.onnx.wasm.proxy = false;
           }
         }
 
@@ -189,12 +191,8 @@ export default function DepthStudioScene() {
       }
 
       setLoadingMsg("ESTIMATING DEPTH...");
-      
-      const transformers = await import('@xenova/transformers');
-      const RawImage = transformers.RawImage;
-      const image = await RawImage.read(imageUrl);
-      
-      const output = await pipelineRef.current(image);
+
+      const output = await pipelineRef.current(imageUrl);
       console.log("Pipeline output:", output);
       
       const depthImage = output?.depth;
@@ -334,13 +332,14 @@ export default function DepthStudioScene() {
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                  const dataUrl = e.target?.result as string;
-                  useAppStore.setState({ uploadedImage: dataUrl });
-                };
-                reader.readAsDataURL(file);
+                const previousImage = useAppStore.getState().uploadedImage;
+                if (previousImage?.startsWith('blob:')) {
+                  URL.revokeObjectURL(previousImage);
+                }
+                const imageUrl = URL.createObjectURL(file);
+                useAppStore.setState({ uploadedImage: imageUrl });
               }
+              e.target.value = "";
             }} 
           />
         </label>
