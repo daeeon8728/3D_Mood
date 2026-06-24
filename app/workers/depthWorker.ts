@@ -6,9 +6,10 @@ env.useBrowserCache = true;
 
 // CRITICAL FIX: Prevent hanging on Windows/Chrome without SharedArrayBuffer
 if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.numThreads = 1; // Disable multithreading
-  env.backends.onnx.wasm.proxy = false; // Disable web worker proxy inside the worker
-  env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
+  env.backends.onnx.wasm.numThreads = 1;
+  env.backends.onnx.wasm.proxy = false;
+  // Point to our locally served WASM files (copied to /public/onnx during build)
+  env.backends.onnx.wasm.wasmPaths = '/onnx/';
 }
 
 class PipelineSingleton {
