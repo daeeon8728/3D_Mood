@@ -144,49 +144,74 @@ export default function DepthStudioScene() {
   const [downloadItem, setDownloadItem] = useState<string>("");
   const [intensity, setIntensity] = useState<number>(0.06);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const workerRef = useRef<Worker | null>(null);
+  const pipelineRef = useRef<any>(null); // Cache the pipeline after first load
 
-  // Initialize Worker
-  useEffect(() => {
-    workerRef.current = new Worker(new URL("./workers/depthWorker.ts", import.meta.url));
-    workerRef.current.onmessage = (e) => {
-      const { status, message, data, width, height, channels } = e.data;
-      if (status === "loading" || status === "processing") {
-        setIsProcessing(true);
-        if (message) setLoadingMsg(message);
-      } else if (status === "progress" && data) {
-        if (data.status === 'progress' && typeof data.progress === 'number') {
-          setDownloadProgress(Math.round(data.progress));
-          if (data.file) setDownloadItem(data.file);
-        }
-      } else if (status === "complete") {
-        setDepthData({ data, width, height, channels });
-        setIsProcessing(false);
-        setErrorMsg(null);
-      } else if (status === "error") {
-        console.error("Depth AI Error:", message);
-        setIsProcessing(false);
-        setErrorMsg(message || 'Unknown error');
-      }
-    };
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, []);
-
-  // Trigger Worker when image changes
-  useEffect(() => {
-    if (uploadedImage && workerRef.current) {
-      setDepthData(null);
+  // Run depth estimation directly (no Web Worker — avoids Turbopack bundling issues)
+  const runDepthAI = async (imageUrl: string) => {
+    try {
       setIsProcessing(true);
-      setDownloadProgress(0);
+      setDepthData(null);
       setErrorMsg(null);
-      setLoadingMsg("INITIALIZING AI MODEL...");
-      workerRef.current.postMessage({ imageUrl: uploadedImage });
+      setDownloadProgress(0);
+
+      // First time: load the transformers library + model
+      if (!pipelineRef.current) {
+        setLoadingMsg("DOWNLOADING AI MODEL...");
+
+        // Dynamically import to avoid SSR issues
+        const { pipeline, env } = await import('@xenova/transformers');
+
+        // Single-thread WASM config — works everywhere without SharedArrayBuffer
+        env.allowLocalModels = false;
+        env.useBrowserCache = true;
+        if (env.backends?.onnx?.wasm) {
+          env.backends.onnx.wasm.numThreads = 1;
+          env.backends.onnx.wasm.proxy = false;
+          env.backends.onnx.wasm.wasmPaths = '/onnx/';
+        }
+
+        pipelineRef.current = await pipeline(
+          'depth-estimation',
+          'Xenova/depth-anything-small-hf',
+          {
+            progress_callback: (x: any) => {
+              if (x?.status === 'progress' && typeof x.progress === 'number') {
+                setDownloadProgress(Math.round(x.progress));
+              }
+              if (x?.file) setDownloadItem(x.file);
+            },
+          }
+        );
+      }
+
+      setLoadingMsg("ESTIMATING DEPTH...");
+      const output = await pipelineRef.current(imageUrl);
+      const depthImage = output.depth;
+
+      setDepthData({
+        data: depthImage.data.slice(0).buffer,
+        width: depthImage.width,
+        height: depthImage.height,
+        channels: depthImage.channels,
+      });
+      setIsProcessing(false);
+    } catch (err: any) {
+      console.error('[DepthAI]', err);
+      setIsProcessing(false);
+      setErrorMsg(err?.message || String(err));
+    }
+  };
+
+  // Trigger when image changes
+  useEffect(() => {
+    if (uploadedImage) {
+      runDepthAI(uploadedImage);
     } else {
       setDepthData(null);
       setIsProcessing(false);
+      setErrorMsg(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadedImage]);
 
   return (
