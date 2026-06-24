@@ -161,14 +161,8 @@ export default function DepthStudioScene() {
         // Dynamically import to avoid SSR issues
         const { pipeline, env } = await import('@xenova/transformers');
 
-        // Single-thread WASM config — works everywhere without SharedArrayBuffer
         env.allowLocalModels = false;
         env.useBrowserCache = true;
-        if (env.backends?.onnx?.wasm) {
-          env.backends.onnx.wasm.numThreads = 1;
-          env.backends.onnx.wasm.proxy = false;
-          env.backends.onnx.wasm.wasmPaths = '/onnx/';
-        }
 
         pipelineRef.current = await pipeline(
           'depth-estimation',
@@ -185,8 +179,17 @@ export default function DepthStudioScene() {
       }
 
       setLoadingMsg("ESTIMATING DEPTH...");
-      const output = await pipelineRef.current(imageUrl);
-      const depthImage = output.depth;
+      
+      const { RawImage } = await import('@xenova/transformers');
+      const image = await RawImage.read(imageUrl);
+      
+      const output = await pipelineRef.current(image);
+      console.log("Pipeline output:", output);
+      
+      const depthImage = output?.depth;
+      if (!depthImage || !depthImage.data) {
+        throw new Error("Invalid output from AI model: " + JSON.stringify(output));
+      }
 
       setDepthData({
         data: depthImage.data.slice(0).buffer,
@@ -320,8 +323,12 @@ export default function DepthStudioScene() {
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
-                const url = URL.createObjectURL(file);
-                useAppStore.setState({ uploadedImage: url });
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  const dataUrl = e.target?.result as string;
+                  useAppStore.setState({ uploadedImage: dataUrl });
+                };
+                reader.readAsDataURL(file);
               }
             }} 
           />
