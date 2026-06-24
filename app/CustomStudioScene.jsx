@@ -12,7 +12,11 @@ import {
 } from "@react-three/drei";
 import { AnimatePresence, motion } from "framer-motion";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three-stdlib";
 import { useAppStore } from "./store/useStore";
+import { useAudioReact } from "./hooks/useAudioReact";
+
+extend({ RoundedBoxGeometry });
 
 const DEFAULT_COLORS = ["#ffffff", "#ff2079", "#00d4ff", "#a855f7", "#4ade80"];
 
@@ -44,22 +48,84 @@ function useOptimizedArtworkTexture(imageUrl, shape) {
   return texture;
 }
 
-function GalleryObject({ imageUrl, shape, mood, keyIntensity }) {
+function GalleryObject({ imageUrl, shape, mood, keyIntensity, audioDataRef }) {
   const meshRef = useRef(null);
   const texture = useOptimizedArtworkTexture(imageUrl, shape);
 
   useFrame((state) => {
     if (!meshRef.current) return;
-    meshRef.current.rotation.y += (mood.rotationSpeed || 0.2) * 0.004;
+    const baseRotationSpeed = (mood.rotationSpeed || 0.2) * 0.004;
+    
+    let audioScale = 1;
+    let extraRotation = 0;
+    if (audioDataRef?.current) {
+      const audio = audioDataRef.current;
+      audioScale = 1 + audio.bass * 0.15;
+      extraRotation = audio.mid * 0.01;
+    }
+
+    meshRef.current.rotation.y += baseRotationSpeed + extraRotation;
     meshRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.9) * 0.045;
+    
+    // Smooth scaling for audio react
+    meshRef.current.scale.lerp(new THREE.Vector3(audioScale, audioScale, audioScale), 0.2);
   });
 
   const geometry = useMemo(() => {
     if (shape === "sphere") return <sphereGeometry args={[1.55, 96, 96]} />;
     if (shape === "box") return <boxGeometry args={[2.35, 2.35, 0.55, 12, 12, 4]} />;
-    return <torusKnotGeometry args={[1.05, 0.32, 280, 32]} />;
+    if (shape === "torusknot") return <torusKnotGeometry args={[1.05, 0.32, 280, 32]} />;
+    return null;
   }, [shape]);
 
+  // Procedural Phone Mockup
+  if (shape === "phone") {
+    return (
+      <PresentationControls global polar={[-0.45, 0.35]} azimuth={[-0.6, 0.6]} snap>
+        <Float speed={1.2} rotationIntensity={0.28} floatIntensity={0.16}>
+          <group ref={meshRef}>
+            {/* Phone Body */}
+            <mesh castShadow receiveShadow>
+              {/* @ts-ignore */}
+              <roundedBoxGeometry args={[2.0, 4.0, 0.2, 8, 0.15]} />
+              <meshPhysicalMaterial color="#111" roughness={0.4} metalness={0.8} />
+            </mesh>
+            {/* Phone Screen */}
+            <mesh position={[0, 0, 0.101]}>
+              <planeGeometry args={[1.85, 3.85]} />
+              <meshBasicMaterial map={texture} />
+            </mesh>
+            <pointLight position={[0, 1.2, 2.2]} intensity={keyIntensity / 110} color={mood.keyLightColor} distance={7} />
+          </group>
+        </Float>
+      </PresentationControls>
+    );
+  }
+
+  // Procedural Poster Mockup
+  if (shape === "poster") {
+    return (
+      <PresentationControls global polar={[-0.45, 0.35]} azimuth={[-0.6, 0.6]} snap>
+        <Float speed={1.2} rotationIntensity={0.28} floatIntensity={0.16}>
+          <group ref={meshRef}>
+            {/* Frame */}
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[3.2, 4.2, 0.1]} />
+              <meshPhysicalMaterial color="#ffffff" roughness={0.2} metalness={0.1} />
+            </mesh>
+            {/* Canvas inside frame */}
+            <mesh position={[0, 0, 0.051]}>
+              <planeGeometry args={[3.0, 4.0]} />
+              <meshStandardMaterial map={texture} roughness={0.8} metalness={0} />
+            </mesh>
+            <pointLight position={[0, 1.2, 2.2]} intensity={keyIntensity / 110} color={mood.keyLightColor} distance={7} />
+          </group>
+        </Float>
+      </PresentationControls>
+    );
+  }
+
+  // Default geometries (sphere, box, knot)
   return (
     <PresentationControls global polar={[-0.45, 0.35]} azimuth={[-0.6, 0.6]} snap>
       <Float speed={1.2} rotationIntensity={0.28} floatIntensity={0.16}>
@@ -138,6 +204,13 @@ function SceneLights({ mood, keyIntensity }) {
 }
 
 function ArtworkStage({ imageUrl, shape, mood, keyIntensity }) {
+  const { getAudioData } = useAudioReact();
+  const audioDataRef = useRef({ bass: 0, mid: 0, treble: 0 });
+
+  useFrame(() => {
+    audioDataRef.current = getAudioData();
+  });
+
   return (
     <>
       <SceneLights mood={mood} keyIntensity={keyIntensity} />
@@ -149,6 +222,7 @@ function ArtworkStage({ imageUrl, shape, mood, keyIntensity }) {
               shape={shape}
               mood={mood}
               keyIntensity={keyIntensity}
+              audioDataRef={audioDataRef}
             />
           </Suspense>
         ) : (
@@ -221,9 +295,11 @@ const SHAPE_OPTIONS = [
   { id: "sphere",    label: "Sphere",    icon: "●" },
   { id: "box",       label: "Box",       icon: "■" },
   { id: "torusknot", label: "Knot",      icon: "✦" },
+  { id: "phone",     label: "Phone",     icon: "📱" },
+  { id: "poster",    label: "Poster",    icon: "🖼" },
 ];
 
-function StudioDock({ onCapture }) {
+function StudioDock({ onCapture, onRecord, isRecording }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [copiedColor, setCopiedColor] = useState(null);
@@ -237,6 +313,8 @@ function StudioDock({ onCapture }) {
   const setMood = useAppStore((s) => s.setMood);
   const heroShape = useAppStore((s) => s.heroShape);
   const setHeroShape = useAppStore((s) => s.setHeroShape);
+  const audioReact = useAppStore((s) => s.audioReact);
+  const setAudioReact = useAppStore((s) => s.setAudioReact);
 
   const colors = palette?.colors?.length ? palette.colors : DEFAULT_COLORS;
 
@@ -366,6 +444,20 @@ function StudioDock({ onCapture }) {
               {preset.label.replace("#", "")}
             </button>
           ))}
+          
+          <button
+            type="button"
+            title="Audio React Mode"
+            onClick={() => setAudioReact(!audioReact)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition ml-2 ${
+              audioReact
+                ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-300"
+                : "border-white/10 bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <span>🎤</span>
+            <span>{audioReact ? "Beat ON" : "Beat OFF"}</span>
+          </button>
         </div>
 
         {/* Palette + Capture */}
@@ -392,7 +484,18 @@ function StudioDock({ onCapture }) {
             onClick={onCapture}
             className="ml-1 h-11 rounded-xl border border-emerald-400/35 bg-emerald-400/15 px-4 text-xs font-bold uppercase tracking-widest text-emerald-200 transition hover:bg-emerald-400/25"
           >
-            ⬇ Capture
+            ⬇ PNG
+          </button>
+          <button
+            type="button"
+            onClick={onRecord}
+            className={`h-11 rounded-xl border px-4 text-xs font-bold uppercase tracking-widest transition flex items-center gap-2 ${
+              isRecording
+                ? "border-red-400/50 bg-red-400/20 text-red-300 animate-pulse"
+                : "border-purple-400/35 bg-purple-400/15 text-purple-200 hover:bg-purple-400/25"
+            }`}
+          >
+            {isRecording ? <><span className="w-2 h-2 rounded-full bg-red-400" /> REC</> : "🎥 WEBM"}
           </button>
         </div>
       </div>
@@ -402,6 +505,9 @@ function StudioDock({ onCapture }) {
 
 export default function CustomStudioScene() {
   const canvasWrapRef = useRef(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
   const uploadedImage = useAppStore((s) => s.uploadedImage);
   const heroShape = useAppStore((s) => s.heroShape);
   const keyIntensity = useAppStore((s) => s.keyIntensity);
@@ -421,6 +527,49 @@ export default function CustomStudioScene() {
     link.download = "3d-mood-gallery-capture.png";
     link.href = canvas.toDataURL("image/png", 1);
     link.click();
+  };
+
+  const handleRecord = () => {
+    const canvas = canvasWrapRef.current?.querySelector("canvas");
+    if (!canvas) return;
+
+    if (isRecording) return;
+    setIsRecording(true);
+    recordedChunksRef.current = [];
+
+    const stream = canvas.captureStream(60); // 60 FPS
+    
+    let options = { mimeType: 'video/webm; codecs=vp9' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      options = { mimeType: 'video/webm; codecs=vp8' };
+    }
+    
+    const mediaRecorder = new MediaRecorder(stream, options);
+    mediaRecorderRef.current = mediaRecorder;
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '3d-mood-gallery-record.webm';
+      link.click();
+      URL.revokeObjectURL(url);
+      setIsRecording(false);
+    };
+
+    mediaRecorder.start();
+    
+    // Stop recording after 4 seconds
+    setTimeout(() => {
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+    }, 4000);
   };
 
   return (
@@ -487,7 +636,14 @@ export default function CustomStudioScene() {
         </div>
       )}
 
-      <StudioDock onCapture={handleCapture} />
+      {isRecording && (
+        <div className="absolute top-6 right-6 z-20 flex items-center gap-2 bg-red-500/20 border border-red-500/50 backdrop-blur-md px-3 py-1.5 rounded-full">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-[10px] font-bold text-red-200 uppercase tracking-widest">Recording...</span>
+        </div>
+      )}
+
+      <StudioDock onCapture={handleCapture} onRecord={handleRecord} isRecording={isRecording} />
     </div>
   );
 }

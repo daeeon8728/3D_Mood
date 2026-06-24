@@ -22,8 +22,8 @@ export interface R3FMoodPreset {
   rotationSpeed: number
 }
 
-// ── 3D 히어로 도형 타입 ──────────────────────────────────────────────
-export type HeroShape = 'torusknot' | 'sphere' | 'box'
+// ── 3D Hero 도형 타입 ──────────────────────────────────────────────
+export type HeroShape = 'torusknot' | 'sphere' | 'box' | 'phone' | 'poster'
 
 // ── 이미지 팔레트 ─────────────────────────────────────────────────────────
 export interface Palette {
@@ -129,6 +129,10 @@ interface AppState {
    */
   applyPaletteToMood: (palette: Palette) => void
   clearImage: () => void
+
+  // ── Audio React ─────────────────────────────────────────────────────────
+  audioReact: boolean
+  setAudioReact: (b: boolean) => void
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────
@@ -213,6 +217,10 @@ export const useAppStore = create<AppState>()(
           'clearImage',
         )
       },
+
+      // ── Audio React ───────────────────────────────────────────────────────
+      audioReact: false,
+      setAudioReact: (b) => set({ audioReact: b }, false, 'setAudioReact'),
     }),
     { name: '3d-mood-store' },
   ),
