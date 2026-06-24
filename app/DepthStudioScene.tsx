@@ -51,7 +51,7 @@ const ParallaxMaterial = shaderMaterial(
 extend({ ParallaxMaterial });
 
 // ── Image with Parallax Mesh ──
-function ParallaxImage({ imageUrl, depthData }: { imageUrl: string; depthData: any }) {
+function ParallaxImage({ imageUrl, depthData, intensity }: { imageUrl: string; depthData: any; intensity: number }) {
   const texture = useTexture(imageUrl);
   const matRef = useRef<any>(null);
 
@@ -81,6 +81,7 @@ function ParallaxImage({ imageUrl, depthData }: { imageUrl: string; depthData: a
       // Smoothly interpolate mouse position for a buttery parallax effect
       matRef.current.uMouse.x = THREE.MathUtils.lerp(matRef.current.uMouse.x, state.mouse.x, 0.05);
       matRef.current.uMouse.y = THREE.MathUtils.lerp(matRef.current.uMouse.y, state.mouse.y, 0.05);
+      matRef.current.uIntensity = intensity;
     }
   });
 
@@ -93,7 +94,7 @@ function ParallaxImage({ imageUrl, depthData }: { imageUrl: string; depthData: a
           ref={matRef}
           uTexture={texture}
           uDepthMap={depthTexture}
-          uIntensity={0.06}
+          uIntensity={intensity}
           transparent
         />
       ) : (
@@ -104,14 +105,14 @@ function ParallaxImage({ imageUrl, depthData }: { imageUrl: string; depthData: a
 }
 
 // ── Main Scene Content ──
-function SceneContent({ imageUrl, depthData }: { imageUrl: string | null; depthData: any }) {
+function SceneContent({ imageUrl, depthData, intensity }: { imageUrl: string | null; depthData: any; intensity: number }) {
   return (
     <>
       <ambientLight intensity={0.5} />
       <Environment preset="city" />
       {imageUrl ? (
         <Suspense fallback={null}>
-          <ParallaxImage imageUrl={imageUrl} depthData={depthData} />
+          <ParallaxImage imageUrl={imageUrl} depthData={depthData} intensity={intensity} />
         </Suspense>
       ) : null}
       
@@ -141,6 +142,7 @@ export default function DepthStudioScene() {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [downloadItem, setDownloadItem] = useState<string>("");
+  const [intensity, setIntensity] = useState<number>(0.06);
   const workerRef = useRef<Worker | null>(null);
 
   // Initialize Worker
@@ -187,8 +189,8 @@ export default function DepthStudioScene() {
   return (
     <div className="relative w-full h-full bg-black overflow-hidden" style={{ isolation: "isolate" }}>
       <div className="absolute inset-0">
-        <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
-          <SceneContent imageUrl={uploadedImage} depthData={depthData} />
+        <Canvas camera={{ position: [0, 0, 6], fov: 45 }} gl={{ preserveDrawingBuffer: true }}>
+          <SceneContent imageUrl={uploadedImage} depthData={depthData} intensity={intensity} />
         </Canvas>
       </div>
 
@@ -252,13 +254,74 @@ export default function DepthStudioScene() {
       {/* ── Help Text if empty ── */}
       {!uploadedImage && !isProcessing && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
-          <p className="text-sm font-bold text-zinc-500 tracking-widest uppercase">Upload an image below</p>
-          <p className="text-xs text-zinc-600 mt-2">to experience AI Depth Parallax</p>
+          <div className="w-16 h-16 rounded-2xl border border-emerald-500/30 flex items-center justify-center mb-6 bg-emerald-500/10">
+            <span className="text-3xl">🕳</span>
+          </div>
+          <p className="text-sm font-bold text-zinc-400 tracking-widest uppercase">Upload an Image</p>
+          <p className="text-xs text-zinc-600 mt-2">to generate a 3D Depth Map</p>
         </div>
       )}
 
-      {/* ── Integrated Studio Dock ── */}
-      <StudioDock />
+      {/* ── Dedicated Depth AI UI ── */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-2xl">
+        
+        {/* Upload Button */}
+        <label className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 hover:bg-white/20 transition-all cursor-pointer border border-white/5 group">
+          <span className="text-xl group-hover:scale-110 transition-transform">🖼️</span>
+          <input 
+            type="file" 
+            className="hidden" 
+            accept="image/*" 
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const url = URL.createObjectURL(file);
+                useAppStore.setState({ uploadedImage: url });
+              }
+            }} 
+          />
+        </label>
+
+        {/* Separator */}
+        <div className="w-[1px] h-8 bg-white/10 mx-4" />
+
+        {/* AI Depth Controls (only show if image uploaded) */}
+        <div className={`flex items-center gap-6 px-2 transition-opacity duration-500 ${uploadedImage ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between items-center w-32">
+              <span className="text-[9px] font-bold text-zinc-500 tracking-widest uppercase">Parallax</span>
+              <span className="text-[9px] font-mono text-emerald-400">{(intensity * 100).toFixed(0)}%</span>
+            </div>
+            <input 
+              type="range" min="0" max="0.1" step="0.01" value={intensity}
+              onChange={(e) => setIntensity(parseFloat(e.target.value))}
+              className="w-32 h-1 bg-zinc-800 rounded-full appearance-none accent-emerald-500" 
+            />
+          </div>
+        </div>
+
+        {/* Export Button */}
+        <div className="w-[1px] h-8 bg-white/10 mx-4" />
+        <button 
+          className={`flex items-center justify-center px-4 h-12 rounded-xl text-[10px] font-bold tracking-widest uppercase transition-all border ${
+            uploadedImage && depthData
+              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/30' 
+              : 'bg-black/40 border-white/5 text-zinc-600 pointer-events-none'
+          }`}
+          onClick={() => {
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+              const link = document.createElement('a');
+              link.download = 'depth-parallax-export.png';
+              link.href = canvas.toDataURL();
+              link.click();
+            }
+          }}
+        >
+          Snapshot
+        </button>
+      </div>
+
     </div>
   );
 }

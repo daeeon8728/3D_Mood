@@ -1,8 +1,12 @@
 import { pipeline, env } from '@xenova/transformers';
 
-// Skip local model check since we are downloading from HF
+// Configure environment for browser
 env.allowLocalModels = false;
 env.useBrowserCache = true;
+// Limit threads to prevent hanging in Web Workers on some browsers
+if (env.backends && env.backends.onnx && env.backends.onnx.wasm) {
+  env.backends.onnx.wasm.numThreads = 1;
+}
 
 class PipelineSingleton {
   static task: any = 'depth-estimation';
@@ -11,7 +15,12 @@ class PipelineSingleton {
 
   static async getInstance(progress_callback: any = null) {
     if (this.instance === null) {
-      this.instance = await pipeline(this.task, this.model, { progress_callback });
+      try {
+        this.instance = await pipeline(this.task, this.model, { progress_callback });
+      } catch (err: any) {
+        console.error("Pipeline initialization failed:", err);
+        throw err;
+      }
     }
     return this.instance;
   }
