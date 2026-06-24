@@ -1,5 +1,15 @@
 "use client";
 
+// ── Example images bundled with the app ──
+const EXAMPLE_IMAGES = [
+  {
+    id: "concrete",
+    label: "Concrete",
+    src: "/example-concrete.jpg",
+    emoji: "🪨",
+  },
+];
+
 import React, { Suspense, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Canvas, useFrame, extend, useThree } from "@react-three/fiber";
 import { OrbitControls, shaderMaterial, useTexture } from "@react-three/drei";
@@ -443,6 +453,42 @@ export default function DepthStudioScene() {
 
       {/* ── Bottom Control Dock ── */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3">
+
+        {/* ── Example Images Row ── */}
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-600 mr-1">Try example</span>
+          {EXAMPLE_IMAGES.map((ex) => (
+            <div key={ex.id} className="flex items-center gap-1">
+              {/* Preview + load into canvas */}
+              <button
+                title={`Use ${ex.label} as sample image`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white text-[10px] font-medium transition-all"
+                onClick={async () => {
+                  const res = await fetch(ex.src);
+                  const blob = await res.blob();
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    const dataUrl = e.target?.result as string;
+                    activateImage(dataUrl);
+                  };
+                  reader.readAsDataURL(blob);
+                }}
+              >
+                <span>{ex.emoji}</span>
+                <span>{ex.label}</span>
+              </button>
+              {/* Download original */}
+              <a
+                href={ex.src}
+                download={`${ex.label.toLowerCase()}-texture.jpg`}
+                title={`Download ${ex.label} texture`}
+                className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/40 text-zinc-500 hover:text-emerald-400 text-[11px] transition-all"
+              >
+                ⬇
+              </a>
+            </div>
+          ))}
+        </div>
 
         {/* ── Thumbnail Gallery Strip ── */}
         {gallery.length > 0 && (
