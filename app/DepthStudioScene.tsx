@@ -134,6 +134,53 @@ function SceneContent({ imageUrl, depthData, intensity }: { imageUrl: string | n
 }
 
 // ── Exported Component ──
+const loadBrowserImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not read the uploaded image."));
+    image.src = src;
+  });
+
+const createFallbackDepthMap = async (imageUrl: string) => {
+  const image = await loadBrowserImage(imageUrl);
+  const maxSize = 512;
+  const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Canvas is not available for depth fallback.");
+
+  ctx.drawImage(image, 0, 0, width, height);
+  const pixels = ctx.getImageData(0, 0, width, height).data;
+  const depth = new Uint8Array(width * height);
+  const cx = width / 2;
+  const cy = height / 2;
+  const maxDistance = Math.hypot(cx, cy) || 1;
+
+  for (let i = 0, j = 0; i < pixels.length; i += 4, j += 1) {
+    const x = j % width;
+    const y = Math.floor(j / width);
+    const luminance = pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114;
+    const alpha = pixels[i + 3] / 255;
+    const centerBias = 1 - Math.min(1, Math.hypot(x - cx, y - cy) / maxDistance);
+    const value = luminance * 0.68 + centerBias * 82;
+    depth[j] = Math.max(0, Math.min(255, Math.round(value * alpha)));
+  }
+
+  return {
+    data: depth.buffer,
+    width,
+    height,
+    channels: 1,
+    fallback: true,
+  };
+};
+
 export default function DepthStudioScene() {
   const uploadedImage = useAppStore((s) => s.uploadedImage);
   
@@ -208,9 +255,19 @@ export default function DepthStudioScene() {
       });
       setIsProcessing(false);
     } catch (err: any) {
-      console.error('[DepthAI]', err);
-      setIsProcessing(false);
-      setErrorMsg(err?.message || String(err));
+      console.warn('[DepthAI] Falling back to browser depth map:', err);
+      try {
+        setLoadingMsg("BUILDING DEPTH MAP...");
+        const fallbackDepth = await createFallbackDepthMap(imageUrl);
+        setDepthData(fallbackDepth);
+        setErrorMsg(null);
+      } catch (fallbackErr: any) {
+        console.error('[DepthAI]', err);
+        console.error('[DepthFallback]', fallbackErr);
+        setErrorMsg(fallbackErr?.message || err?.message || String(err));
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
