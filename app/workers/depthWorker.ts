@@ -25,7 +25,8 @@ self.addEventListener('message', async (event) => {
     self.postMessage({ status: 'loading', message: 'Loading AI model...' });
 
     const depthEstimator = await PipelineSingleton.getInstance((x: any) => {
-      self.postMessage({ status: 'progress', progress: x });
+      // x is an object: { status: 'progress' | 'download' | 'initiate' | 'done', progress: number, file: string }
+      self.postMessage({ status: 'progress', data: x });
     });
 
     self.postMessage({ status: 'processing', message: 'Estimating depth...' });

@@ -139,6 +139,8 @@ export default function DepthStudioScene() {
   const [depthData, setDepthData] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [downloadItem, setDownloadItem] = useState<string>("");
   const workerRef = useRef<Worker | null>(null);
 
   // Initialize Worker
@@ -149,6 +151,11 @@ export default function DepthStudioScene() {
       if (status === "loading" || status === "processing") {
         setIsProcessing(true);
         if (message) setLoadingMsg(message);
+      } else if (status === "progress" && data) {
+        if (data.status === 'progress' && typeof data.progress === 'number') {
+          setDownloadProgress(Math.round(data.progress));
+          if (data.file) setDownloadItem(data.file);
+        }
       } else if (status === "complete") {
         setDepthData({ data, width, height, channels });
         setIsProcessing(false);
@@ -168,7 +175,8 @@ export default function DepthStudioScene() {
     if (uploadedImage && workerRef.current) {
       setDepthData(null);
       setIsProcessing(true);
-      setLoadingMsg("Initializing AI Model...");
+      setDownloadProgress(0);
+      setLoadingMsg("INITIALIZING AI MODEL...");
       workerRef.current.postMessage({ imageUrl: uploadedImage });
     } else {
       setDepthData(null);
@@ -204,22 +212,38 @@ export default function DepthStudioScene() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md pointer-events-none"
           >
-            <div className="w-12 h-12 rounded-2xl border border-emerald-500/30 flex items-center justify-center mb-6">
+            <div className="w-16 h-16 rounded-2xl border border-emerald-500/30 flex items-center justify-center mb-6 bg-emerald-500/10">
               <motion.span
-                className="text-2xl"
+                className="text-3xl"
                 animate={{ rotateY: [0, 360] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
               >
                 🕳
               </motion.span>
             </div>
-            <p className="text-xs font-bold text-emerald-400 tracking-widest uppercase mb-2">
+            <p className="text-sm font-bold text-emerald-400 tracking-widest uppercase mb-4">
               {loadingMsg}
             </p>
-            <p className="text-[10px] text-zinc-400 text-center max-w-[200px]">
-              First-time generation requires downloading a 40MB AI model. Please wait.
+            
+            {/* Progress Bar */}
+            <div className="w-64 max-w-[80vw] bg-zinc-900 rounded-full h-1.5 mb-2 overflow-hidden border border-white/5 shadow-inner">
+              <motion.div 
+                className="bg-emerald-500 h-full shadow-[0_0_10px_#10b981]"
+                initial={{ width: 0 }}
+                animate={{ width: `${downloadProgress}%` }}
+                transition={{ ease: "linear", duration: 0.2 }}
+              />
+            </div>
+            
+            <div className="flex justify-between w-64 text-[10px] text-zinc-500 font-mono">
+              <span className="truncate pr-4">{downloadItem || "Downloading Model..."}</span>
+              <span>{downloadProgress}%</span>
+            </div>
+
+            <p className="text-[10px] text-zinc-400 text-center max-w-[250px] mt-8 leading-relaxed">
+              First-time generation requires downloading a 40MB AI model.<br/>This ensures 100% private, free, and infinite usage.
             </p>
           </motion.div>
         )}
