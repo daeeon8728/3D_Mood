@@ -226,6 +226,7 @@ const SHAPE_OPTIONS = [
 function StudioDock({ onCapture }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
+  const [copiedColor, setCopiedColor] = useState(null);
   const uploadedImage = useAppStore((s) => s.uploadedImage);
   const palette = useAppStore((s) => s.palette);
   const clearImage = useAppStore((s) => s.clearImage);
@@ -262,7 +263,10 @@ function StudioDock({ onCapture }) {
   };
 
   const copyColor = (hex) => {
-    navigator.clipboard?.writeText(hex).catch(() => {});
+    navigator.clipboard?.writeText(hex).then(() => {
+      setCopiedColor(hex);
+      setTimeout(() => setCopiedColor(null), 1500);
+    }).catch(() => {});
   };
 
   return (
@@ -367,14 +371,21 @@ function StudioDock({ onCapture }) {
         {/* Palette + Capture */}
         <div className="flex items-center gap-2">
           {colors.slice(0, 5).map((hex) => (
-            <button
-              key={hex}
-              type="button"
-              title={`Copy ${hex}`}
-              onClick={() => copyColor(hex)}
-              className="h-8 w-8 rounded-lg border border-white/20 shadow-lg transition hover:-translate-y-0.5"
-              style={{ backgroundColor: hex }}
-            />
+            <div key={hex} className="relative">
+              <button
+                type="button"
+                title={`Copy ${hex}`}
+                onClick={() => copyColor(hex)}
+                className="h-8 w-8 rounded-lg border border-white/20 shadow-lg transition hover:-translate-y-0.5 relative overflow-hidden"
+                style={{ backgroundColor: hex }}
+              >
+                {copiedColor === hex && (
+                  <span className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white tracking-widest">
+                    COPIED
+                  </span>
+                )}
+              </button>
+            </div>
           ))}
           <button
             type="button"
