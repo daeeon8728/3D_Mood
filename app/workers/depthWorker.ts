@@ -3,9 +3,12 @@ import { pipeline, env } from '@xenova/transformers';
 // Configure environment for browser
 env.allowLocalModels = false;
 env.useBrowserCache = true;
-// Limit threads to prevent hanging in Web Workers on some browsers
-if (env.backends && env.backends.onnx && env.backends.onnx.wasm) {
-  env.backends.onnx.wasm.numThreads = 1;
+
+// CRITICAL FIX: Prevent hanging on Windows/Chrome without SharedArrayBuffer
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.numThreads = 1; // Disable multithreading
+  env.backends.onnx.wasm.proxy = false; // Disable web worker proxy inside the worker
+  env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
 }
 
 class PipelineSingleton {
