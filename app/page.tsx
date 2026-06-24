@@ -25,6 +25,7 @@ const Spline = dynamic(() => import("@splinetool/react-spline"), {
 // Dual-Engine: High-End R3F Studios
 const DepthStudioScene = dynamic(() => import('./DepthStudioScene'), { ssr: false });
 const MockupStudioScene = dynamic(() => import('./MockupStudioScene'), { ssr: false });
+const CustomStudioScene = dynamic(() => import('./CustomStudioScene'), { ssr: false });
 
 // Force preserveDrawingBuffer to allow Spline canvas screenshotting
 if (typeof window !== "undefined") {
@@ -230,11 +231,12 @@ function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose, onReplay
             {/* ── Engine Mode Switcher ── */}
             <div className="px-6 py-5 border-t border-zinc-100">
               <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400 mb-3">Engine</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {([
                   { mode: 'spline' as const, icon: '✦', label: 'Showroom', sub: 'Spline 3D' },
                   { mode: 'depth' as const,  icon: '🕳', label: 'Depth AI', sub: 'Parallax' },
                   { mode: 'mockup' as const, icon: '✨', label: 'Material', sub: 'Finishes' },
+                  { mode: 'custom' as const, icon: 'G', label: 'Gallery', sub: 'Artwork' },
                 ]).map(({ mode, icon, label, sub }) => (
                   <motion.button
                     key={mode}
@@ -1600,6 +1602,23 @@ export default function ThreeDMoodApp() {
                   </div>
                 }>
                   <MockupStudioScene />
+                </Suspense>
+              </motion.div>
+            ) : viewMode === 'custom' ? (
+              <motion.div
+                key="custom-engine"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Suspense fallback={
+                  <div className="w-full h-full flex items-center justify-center bg-black">
+                    <KineticLoading isVisible />
+                  </div>
+                }>
+                  <CustomStudioScene />
                 </Suspense>
               </motion.div>
             ) : null}

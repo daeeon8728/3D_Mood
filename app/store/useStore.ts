@@ -87,7 +87,7 @@ export const R3F_MOOD_PRESETS: R3FMoodPreset[] = [
   },
 ]
 
-export type ViewMode = 'spline' | 'depth' | 'mockup'
+export type ViewMode = 'spline' | 'depth' | 'mockup' | 'custom'
 
 // ── 헬퍼: hex 색상 어둡게 (배경색 생성용) ────────────────────────────────
 const darkenHex = (hex: string, factor: number): string => {
