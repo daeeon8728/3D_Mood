@@ -142,7 +142,12 @@ export default function MockupStudioScene() {
       </div>
 
       {/* ── UI Panels ── */}
-      <div className="absolute top-20 right-6 z-20 flex flex-col gap-6">
+      <motion.div 
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 25 }}
+        className="absolute top-20 right-6 z-20 flex flex-col gap-6"
+      >
         {/* Material Switcher */}
         <div className="flex flex-col gap-2">
           <p className="text-[9px] font-bold tracking-widest uppercase text-zinc-500 mb-1 text-right">Finishes</p>
@@ -169,7 +174,7 @@ export default function MockupStudioScene() {
             📸 Snapshot
           </button>
         )}
-      </div>
+      </motion.div>
 
       {!uploadedImage && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
