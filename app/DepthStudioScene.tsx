@@ -452,14 +452,17 @@ export default function DepthStudioScene() {
       )}
 
       {/* ── Bottom Control Dock ── */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3">
-
+      <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 25 }}
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3"
+      >
         {/* ── Example Images Row ── */}
         <div className="flex items-center gap-2">
           <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-600 mr-1">Try example</span>
           {EXAMPLE_IMAGES.map((ex) => (
             <div key={ex.id} className="flex items-center gap-1">
-              {/* Preview + load into canvas */}
               <button
                 title={`Use ${ex.label} as sample image`}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white text-[10px] font-medium transition-all"
@@ -477,25 +480,27 @@ export default function DepthStudioScene() {
                 <span>{ex.emoji}</span>
                 <span>{ex.label}</span>
               </button>
-              {/* Download original */}
-              <a
-                href={ex.src}
-                download={`${ex.label.toLowerCase()}-texture.jpg`}
-                title={`Download ${ex.label} texture`}
-                className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/40 text-zinc-500 hover:text-emerald-400 text-[11px] transition-all"
+              <button
+                title={`Download ${ex.label} image`}
+                className="px-2 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white transition-all flex items-center justify-center"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = ex.src;
+                  link.download = `3dmood-example-${ex.id}.jpg`;
+                  link.click();
+                }}
               >
-                ⬇
-              </a>
+                <span className="text-[10px] font-bold text-emerald-400">⬇</span>
+              </button>
             </div>
           ))}
         </div>
 
-        {/* ── Thumbnail Gallery Strip ── */}
+        {/* ── Thumbnail Strip ── */}
         {gallery.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-xl max-w-[80vw] overflow-x-auto"
-            style={{ scrollbarWidth: "none" }}
+            className="flex items-center gap-2 bg-black/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 max-w-[80vw] overflow-x-auto no-scrollbar"
           >
             <AnimatePresence>
               {gallery.map((url) => (
@@ -577,7 +582,7 @@ export default function DepthStudioScene() {
             <span>⬇</span> Export PNG
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

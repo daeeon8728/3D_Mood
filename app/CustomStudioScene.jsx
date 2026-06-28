@@ -349,9 +349,9 @@ function StudioDock({ onCapture, onRecord, isRecording }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 28 }}
+      initial={{ opacity: 0, y: 100 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ type: "spring", stiffness: 260, damping: 25 }}
       className="absolute bottom-6 left-1/2 z-30 w-[min(960px,calc(100vw-32px))] -translate-x-1/2"
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
