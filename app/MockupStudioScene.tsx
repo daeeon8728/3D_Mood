@@ -177,9 +177,20 @@ export default function MockupStudioScene() {
       </motion.div>
 
       {!uploadedImage && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
-          <div className="w-16 h-16 rounded-2xl border border-purple-500/30 flex items-center justify-center mb-6 bg-purple-500/10"><span className="text-3xl">✨</span></div>
-          <p className="text-sm font-bold text-zinc-400 tracking-widest uppercase">Upload a Design</p>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-auto">
+          <label className="cursor-pointer group flex flex-col items-center">
+            <div className="w-16 h-16 rounded-2xl border border-purple-500/30 flex items-center justify-center mb-6 bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
+              <span className="text-3xl">✨</span>
+            </div>
+            <p className="text-sm font-bold text-zinc-400 group-hover:text-purple-300 tracking-widest uppercase transition-colors">Upload a Design</p>
+            <input type="file" accept="image/*" hidden onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const url = URL.createObjectURL(file);
+                useAppStore.getState().setUploadedImage(url);
+              }
+            }} />
+          </label>
         </div>
       )}
       <StudioDock />

@@ -341,10 +341,21 @@ function StudioDock({ onCapture, onRecord, isRecording }) {
   };
 
   const copyColor = (hex) => {
-    navigator.clipboard?.writeText(hex).then(() => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(hex).then(() => {
+        setCopiedColor(hex);
+        setTimeout(() => setCopiedColor(null), 1500);
+      }).catch(() => {});
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = hex;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
       setCopiedColor(hex);
       setTimeout(() => setCopiedColor(null), 1500);
-    }).catch(() => {});
+    }
   };
 
   return (
@@ -626,11 +637,26 @@ export default function CustomStudioScene() {
       </div>
 
       {!uploadedImage && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center">
-          <p className="text-sm font-bold uppercase tracking-[0.22em] text-zinc-400">
-            Upload artwork
-          </p>
-          <p className="mt-2 max-w-sm text-xs leading-relaxed text-zinc-600">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center">
+          <label className="cursor-pointer group flex flex-col items-center">
+            <div className="w-16 h-16 rounded-2xl border border-emerald-500/30 flex items-center justify-center mb-6 bg-emerald-500/10 group-hover:bg-emerald-500/20 transition-colors">
+              <span className="text-3xl">🖼️</span>
+            </div>
+            <p className="text-sm font-bold uppercase tracking-[0.22em] text-zinc-300 group-hover:text-emerald-300 transition-colors">
+              Upload artwork
+            </p>
+            <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const url = URL.createObjectURL(file);
+                useAppStore.getState().setUploadedImage(url);
+                readPalette(file).then(palette => {
+                  if (palette) useAppStore.getState().applyPaletteToMood(palette);
+                });
+              }
+            }} />
+          </label>
+          <p className="mt-4 max-w-sm text-xs leading-relaxed text-zinc-600">
             The scene will map your image as a crisp glossy texture on the selected gallery object.
           </p>
         </div>

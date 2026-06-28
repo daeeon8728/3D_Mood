@@ -164,114 +164,191 @@ function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  NAVIGATION DRAWER
+//  NAVIGATION DRAWER  — Dark Glassmorphism Overlay
 // ─────────────────────────────────────────────────────────────────────────────
-function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose, onReplayIntro }:
-  { isOpen: boolean; activeSection: string; onScrollTo: (id: string) => void; onClose: () => void; onReplayIntro: () => void }) {
-  // Zustand selectors — viewMode/setViewMode만 구독, 다른 상태 변화엔 리렌더 안 함
+function NavigationDrawer({ isOpen, activeSection, onScrollTo, onClose }:
+  { isOpen: boolean; activeSection: string; onScrollTo: (id: string) => void; onClose: () => void }) {
   const viewMode    = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
-  const navItems = [
-    { id: "studio",    label: "3D Studio",       icon: "✦", desc: "Interactive Spline scenes" },
-    { id: "mood",      label: "Mood & Lighting", icon: "◎", desc: "Color & atmosphere" },
-    { id: "guestbook", label: "Guestbook",       icon: "✉", desc: "Community notes" },
-    { id: "feedback",  label: "Feedback",        icon: "◈", desc: "Critic dashboard" },
+  const [copied, setCopied] = React.useState<string | null>(null);
+  const [form, setForm] = React.useState({ q1: '', q2: '', q3: '' });
+  const [submitted, setSubmitted] = React.useState(false);
+
+  const copyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    }).catch(() => {});
+  };
+
+  const handleSubmit = () => {
+    const body = [
+      `Q1 — First impressions: ${form.q1}`,
+      `Q2 — Improvements: ${form.q2}`,
+      `Q3 — Desired features: ${form.q3}`,
+    ].join('\n\n');
+    const mailto = `mailto:ldu060303@gmail.com?subject=3D Mood — Design Review&body=${encodeURIComponent(body)}`;
+    window.open(mailto, '_blank');
+    setSubmitted(true);
+    setTimeout(() => setSubmitted(false), 3000);
+  };
+
+  const engines = [
+    { mode: 'spline' as const, icon: '✦', label: 'Showroom', sub: 'Spline 3D' },
+    { mode: 'depth' as const,  icon: '🕳️', label: 'Depth AI', sub: 'Parallax' },
+    { mode: 'mockup' as const, icon: '✨', label: 'Material', sub: 'Finishes' },
+    { mode: 'custom' as const, icon: '🖼️', label: 'Gallery', sub: 'Artwork' },
   ];
+
   return (
     <>
       <CustomCursor />
       <AnimatePresence>
         {isOpen && (
-          <motion.div key="backdrop" className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-            initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={onClose} />
+          <motion.div key="backdrop"
+            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {isOpen && (
-          <motion.aside key="drawer" className="fixed top-0 right-0 h-full w-full max-w-sm z-50 flex flex-col overflow-y-auto"
-            style={{ background:"#fff" }} variants={drawerVariants as any} initial="hidden" animate="visible" exit="exit">
-            <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-zinc-100">
-              <div>
-                <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">Navigation</p>
-                <p className="text-xl font-bold text-black mt-0.5">3D Mood</p>
+          <motion.aside
+            key="drawer"
+            className="fixed top-0 right-0 h-full w-full max-w-md z-50 flex flex-col overflow-y-auto"
+            style={{
+              background: 'rgba(8, 8, 10, 0.95)',
+              backdropFilter: 'blur(32px)',
+              WebkitBackdropFilter: 'blur(32px)',
+              borderLeft: '1px solid rgba(255,255,255,0.07)',
+            }}
+            variants={drawerVariants as any}
+            initial="hidden" animate="visible" exit="exit"
+          >
+            {/* ── Logo Header ── */}
+            <div className="flex items-center justify-between px-8 pt-8 pb-6 border-b border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-[0_0_28px_rgba(255,255,255,0.2)]">
+                  <span className="text-black text-sm font-black tracking-tight">3D</span>
+                </div>
+                <div>
+                  <p className="text-white font-bold text-lg tracking-tight">3D Mood</p>
+                  <p className="text-[10px] text-zinc-600 tracking-[0.18em] uppercase">for designers</p>
+                </div>
               </div>
               <button id="drawer-close-btn" onClick={onClose}
-                className="w-9 h-9 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center transition-colors">
-                <span className="text-black text-xl leading-none">×</span>
+                className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors text-zinc-400 hover:text-white">
+                <span className="text-xl leading-none">×</span>
               </button>
             </div>
-            <div className="px-6 py-6 border-b border-zinc-100">
-              <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100">
-                <p className="font-bold text-sm text-black mb-1">Showroom Active</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  Explore curated 3D scenes, set the mood, leave notes, and critique designs — no sign-in needed.
-                </p>
-              </div>
-            </div>
-            <nav className="px-6 py-6 flex-1">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400 mb-3">Spaces</p>
-              <div className="space-y-1">
-                {navItems.map(({ id, label, icon, desc }) => (
-                  <motion.button key={id} id={`nav-${id}`}
-                    onClick={() => { onScrollTo(id); onClose(); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left transition-all ${activeSection===id?"bg-black text-white":"text-zinc-700 hover:bg-zinc-50"}`}
-                    whileHover={{ x:4 }} whileTap={{ scale:0.98 }}
-                    transition={{ type:"spring", stiffness:600, damping:40 }}>
-                    <span className="text-base flex-shrink-0">{icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{label}</p>
-                      <p className="text-xs mt-0.5 text-zinc-400">{desc}</p>
-                    </div>
-                    {activeSection===id && <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />}
-                  </motion.button>
-                ))}
-              </div>
-            </nav>
 
-            {/* ── Engine Mode Switcher ── */}
-            <div className="px-6 py-5 border-t border-zinc-100">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-zinc-400 mb-3">Engine</p>
+            {/* ── Studio Engine Switcher ── */}
+            <div className="px-8 py-6 border-b border-white/[0.06]">
+              <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-600 mb-3">Studio Engine</p>
               <div className="grid grid-cols-4 gap-2">
-                {([
-                  { mode: 'spline' as const, icon: '✦', label: 'Showroom', sub: 'Spline 3D' },
-                  { mode: 'depth' as const,  icon: '🕳', label: 'Depth AI', sub: 'Parallax' },
-                  { mode: 'mockup' as const, icon: '✨', label: 'Material', sub: 'Finishes' },
-                  { mode: 'custom' as const, icon: 'G', label: 'Gallery', sub: 'Artwork' },
-                ]).map(({ mode, icon, label, sub }) => (
+                {engines.map(({ mode, icon, label, sub }) => (
                   <motion.button
                     key={mode}
                     onClick={() => { setViewMode(mode); onClose(); }}
-                    whileTap={{ scale: 0.97 }}
+                    whileTap={{ scale: 0.95 }}
                     className={`flex flex-col items-center gap-1.5 py-3.5 rounded-xl border transition-all ${
                       viewMode === mode
-                        ? 'bg-black text-white border-zinc-700'
-                        : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50 hover:border-zinc-300'
+                        ? 'bg-white/10 border-white/20 text-white'
+                        : 'border-white/5 bg-white/[0.02] text-zinc-600 hover:bg-white/5 hover:text-zinc-400'
                     }`}
                   >
                     <span className="text-xl leading-none">{icon}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
-                    <span className="text-[9px] text-zinc-400">{sub}</span>
-                    {viewMode === mode && (
-                      <motion.span layoutId="engine-indicator" className="w-1 h-1 rounded-full bg-white mt-0.5" />
-                    )}
+                    <span className="text-[9px] opacity-60">{sub}</span>
                   </motion.button>
                 ))}
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-zinc-100 flex flex-col gap-3">
-              <motion.button
-                onClick={() => { onReplayIntro(); onClose(); }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-600 hover:bg-zinc-900 transition-all group"
-                whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-              >
-                <span className="text-lg leading-none">✦</span>
-                <div className="flex flex-col items-start">
-                  <span className="text-xs font-bold text-white tracking-wide">Replay Intro</span>
-                  <span className="text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors">Watch the neon sign again</span>
-                </div>
-              </motion.button>
-              <p className="text-xs text-zinc-300 text-center">© 2026 3D Mood · Powered by Spline</p>
+            {/* ── Section 1: Who made this? ── */}
+            <div className="px-8 py-7 border-b border-white/[0.06]">
+              <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-600 mb-4">Who made this?</p>
+              <p className="text-white text-sm font-semibold leading-snug mb-2">A developer expanding the possibilities of design through technology.</p>
+              <p className="text-zinc-500 text-xs leading-relaxed">
+                I built 3D Mood because I wanted to express the sense of space beyond pixels.
+                I’d love to experiment together to find where your design shines brightest.
+              </p>
+            </div>
+
+            {/* ── Section 2: Design Philosophy ── */}
+            <div className="px-8 py-7 border-b border-white/[0.06]">
+              <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-600 mb-4">Design Philosophy</p>
+              <p className="text-white text-sm font-semibold leading-snug mb-2">3D on the web doesn’t have to be heavy or slow.</p>
+              <p className="text-zinc-500 text-xs leading-relaxed">
+                This tool exists to prove that real-time depth control and light quality adjustment,
+                directly in the browser, can dramatically elevate the immersiveness of your design.
+              </p>
+            </div>
+
+            {/* ── Section 3: Design Review Form ── */}
+            <div className="px-8 py-7 border-b border-white/[0.06]">
+              <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-600 mb-5">Design Review Request</p>
+              <div className="space-y-4">
+                {([
+                  { key: 'q1' as const, label: '1. What are your first impressions?' },
+                  { key: 'q2' as const, label: '2. What could be improved?' },
+                  { key: 'q3' as const, label: '3. What features would you like next?' },
+                ] as const).map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="block text-[11px] text-zinc-500 mb-1.5 font-medium">{label}</label>
+                    <textarea
+                      rows={2}
+                      value={form[key]}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                      placeholder="Type your thoughts..."
+                      className="w-full bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3 text-xs text-white placeholder-zinc-700 resize-none focus:outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all"
+                    />
+                  </div>
+                ))}
+                <motion.button
+                  onClick={handleSubmit}
+                  whileTap={{ scale: 0.97 }}
+                  disabled={submitted}
+                  className={`w-full py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border ${
+                    submitted
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 pointer-events-none'
+                      : 'bg-white/[0.06] border-white/10 text-white hover:bg-white/10 hover:border-white/20'
+                  }`}
+                >
+                  {submitted ? '✓ Opening Mail...' : 'Send Review via Email'}
+                </motion.button>
+              </div>
+            </div>
+
+            {/* ── Footer: Contact Buttons ── */}
+            <div className="px-8 py-6">
+              <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-zinc-600 mb-3">Contact</p>
+              <div className="flex gap-2">
+                <motion.button
+                  onClick={() => copyText('ldu060303@gmail.com', 'email')}
+                  whileTap={{ scale: 0.96 }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    copied === 'email'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                      : 'border-white/8 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/8'
+                  }`}
+                >
+                  <span>✉</span> {copied === 'email' ? 'Copied!' : 'Copy Email'}
+                </motion.button>
+                <motion.button
+                  onClick={() => copyText('+82 10 4354 0528', 'phone')}
+                  whileTap={{ scale: 0.96 }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                    copied === 'phone'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                      : 'border-white/8 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/8'
+                  }`}
+                >
+                  <span>📞</span> {copied === 'phone' ? 'Copied!' : 'Copy Phone'}
+                </motion.button>
+              </div>
+              <p className="text-[10px] text-zinc-700 text-center mt-5">© 2026 3D Mood · Powered by Spline</p>
             </div>
           </motion.aside>
         )}
@@ -1405,22 +1482,9 @@ function CriticPopover({ popover, onClose, onSubmit }:
 //  ROOT APPLICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ThreeDMoodApp() {
-  // ── Intro skip: returning users go straight to main scene ──────────────
-  const [introCompleted, setIntroCompleted] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("hasSeenIntro");
-  });
-
-  const handleIntroComplete = (remember: boolean) => {
-    if (remember) localStorage.setItem("hasSeenIntro", "1");
-    setIntroCompleted(true);
-  };
-
-  const handleReplayIntro = () => {
-    localStorage.removeItem("hasSeenIntro");
-    setIntroCompleted(false);
-    window.scrollTo({ top: 0, behavior: "instant" });
-  };
+  // ── Intro disabled — always show main view immediately ────────────────
+  const introCompleted = true;
+  const handleReplayIntro = () => {}; // kept for type safety, unused
 
   // Dual-Engine: viewMode를 Zustand에서 직접 구독 (prop drilling 없음)
   const viewMode = useAppStore((s) => s.viewMode);
@@ -1497,13 +1561,7 @@ export default function ThreeDMoodApp() {
 
   return (
     <>
-      <AnimatePresence>
-        {!introCompleted && (
-          <NeonSign key="intro" onExplore={handleIntroComplete} />
-        )}
-      </AnimatePresence>
-
-      <div className={`min-h-screen bg-black overflow-x-hidden ${(presentationMode || !introCompleted) ? "h-screen overflow-hidden" : ""}`}>
+      <div className={`min-h-screen bg-black overflow-x-hidden ${presentationMode ? "h-screen overflow-hidden" : ""}`}>
         {/* ── Fixed Header ── */}
       <header className={`fixed top-0 left-0 right-0 z-30 h-16 flex items-center justify-between px-6 lg:px-10 transition-opacity duration-700 ${presentationMode ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         style={{ background:"rgba(0,0,0,0.78)", backdropFilter:"blur(24px)", WebkitBackdropFilter:"blur(24px)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
@@ -1541,8 +1599,7 @@ export default function ThreeDMoodApp() {
       </header>
 
       <NavigationDrawer isOpen={drawerOpen} activeSection={activeSection}
-        onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)}
-        onReplayIntro={handleReplayIntro} />
+        onScrollTo={scrollToSection} onClose={() => setDrawerOpen(false)} />
 
       {/* ── 3D Studio (Dual-Engine: Spline 쇼룸 ↔ Custom R3F 작업실) ── */}
       <section ref={studioRef} id="studio" className="relative" style={{ height:"100vh" }}>
